@@ -34,19 +34,16 @@ Aturan wajib:
 1. Jawab selalu dalam bahasa Indonesia yang sopan, jelas, dan mudah dimengerti.
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
 3. Jawab dengan lengkap dan akurat sesuai pengetahuan terbaru.
-4. Jika tidak ada hasil pencarian, jawab berdasarkan data yang Anda miliki.
+4. Jika tidak ada hasil pencarian, jawab berdasarkan data yang kamu miliki.
+5. Tawarkan sesuatu tentang topik yang sedang dibahas oleh pengguna sebagai penutup jawaban yang kamu berikan.
 """
 
-# Kunci API
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
-# ==========================================
-# Inisialisasi Model
-# ==========================================
 model_gemini = None
 client_gemini = None
 if GEMINI_API_KEY:
@@ -67,9 +64,6 @@ if GROQ_API_KEY:
     except Exception as e:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
-# ==========================================
-# FUNGSI: MEMBUAT GAMBAR
-# ==========================================
 def buat_gambar(deskripsi: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ Fitur pembuatan gambar belum dikonfigurasi."
@@ -98,13 +92,9 @@ def buat_gambar(deskripsi: str) -> str:
         logger.warning(f"❌ Gagal buat gambar: {str(e)}")
         return "❌ Maaf, tidak dapat membuat gambar saat ini."
 
-# ==========================================
-# FUNGSI: CARI INFORMASI TERBARU
-# ==========================================
 def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
 
-    # SerpApi
     if SERPAPI_KEY and len(SERPAPI_KEY) > 10:
         try:
             res = requests.get(
@@ -134,7 +124,6 @@ def cari_informasi(kueri: str) -> str | None:
         except Exception as e:
             logger.warning(f"⚠️ SerpApi gagal: {str(e)}")
 
-    # DuckDuckGo cadangan
     try:
         res = requests.get(
             "https://api.duckduckgo.com/",
@@ -151,9 +140,6 @@ def cari_informasi(kueri: str) -> str | None:
     logger.info("⚠️ Tidak ada hasil pencarian, lanjut ke jawaban AI")
     return None
 
-# ==========================================
-# FUNGSI UTAMA
-# ==========================================
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
@@ -175,7 +161,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
 
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
-    # 1. OpenRouter (model diperbaiki)
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
@@ -198,7 +183,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
-    # 2. Groq (model diganti yang aktif)
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
@@ -210,7 +194,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
 
-    # 3. Gemini
     if client_gemini and model_gemini:
         try:
             res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
@@ -219,7 +202,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Gemini gagal: {str(e)}")
 
-    # 4. Mistral
     if MISTRAL_API_KEY:
         try:
             res = requests.post(
