@@ -7,11 +7,12 @@ import os
 import logging
 import requests
 import json
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.4.4")
+app = FastAPI(title="Alina AI", version="1.4.5")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,14 +27,14 @@ if not os.path.exists("static"):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-INSTRUKSI_SISTEM = """
+INSTRUKSI_SISTEM = f"""
 Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
+Tanggal saat ini adalah {datetime.now().strftime('%d %B %Y')}.
 Aturan wajib:
 1. Jawab selalu dalam bahasa Indonesia yang sopan, lembut, dan mudah dimengerti.
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
-3. Jangan menyebutkan nama model atau layanan AI luar.
+3. Jika pertanyaan membutuhkan data terbaru, berita, atau keadaan saat ini, gunakan hasil pencarian yang disediakan.
 4. Jawab secara lengkap dan bermanfaat.
-5. Jika diminta membuat gambar atau mencari informasi terbaru, laksanakan sesuai kemampuan yang tersedia.
 """
 
 # Kunci API
@@ -98,16 +99,16 @@ def buat_gambar(deskripsi: str) -> str:
         return "❌ Maaf, tidak dapat membuat gambar saat ini."
 
 # ==========================================
-# FUNGSI: CARI INFORMASI TERBARU / BROWSING
+# FUNGSI: CARI INFORMASI TERBARU
 # ==========================================
 def cari_informasi(kueri: str) -> str:
-    # Opsi 1: Pakai SerpApi jika tersedia (hasil paling lengkap)
+    # Opsi 1: SerpApi
     if SERPAPI_KEY and SERPAPI_KEY.strip():
         try:
             res = requests.get(
                 "https://serpapi.com/search",
                 params={
-                    "q": kueri,
+                    "q": f"{kueri} Indonesia",
                     "api_key": SERPAPI_KEY,
                     "engine": "google",
                     "hl": "id",
@@ -121,13 +122,11 @@ def cari_informasi(kueri: str) -> str:
 
             hasil = "🔍 **Informasi Terbaru:**\n\n"
 
-            # Ambil jawaban langsung jika ada
             if "answer_box" in data and data["answer_box"].get("snippet"):
-                hasil += f"**Jawaban:**\n{data['answer_box']['snippet']}\n\n"
+                hasil += f"**Jawaban Singkat:**\n{data['answer_box']['snippet']}\n\n"
 
-            # Ambil hasil pencarian utama
             if "organic_results" in data and len(data["organic_results"]) > 0:
-                hasil += "**Sumber & Ringkasan:**\n"
+                hasil += "**Sumber Informasi:**\n"
                 for idx, item in enumerate(data["organic_results"][:3], 1):
                     judul = item.get("title", "Tanpa Judul")
                     ringkasan = item.get("snippet", "Tidak ada ringkasan")
@@ -135,12 +134,12 @@ def cari_informasi(kueri: str) -> str:
                     hasil += f"{idx}. **{judul}**\n{ringkasan}\n🔗 {tautan}\n\n"
                 return hasil
 
-            return "🔍 Pencarian selesai, namun tidak ditemukan hasil yang cukup relevan."
+            return "🔍 Pencarian selesai, namun tidak ditemukan hasil yang relevan."
 
         except Exception as e:
             logger.warning(f"⚠️ SerpApi gagal: {str(e)}")
 
-    # Opsi 2: Cadangan - DuckDuckGo yang diperbaiki
+    # Opsi 2: DuckDuckGo
     try:
         res = requests.get(
             "https://api.duckduckgo.com/",
@@ -159,16 +158,14 @@ def cari_informasi(kueri: str) -> str:
         hasil = "🔍 **Informasi yang Ditemukan:**\n\n"
         ditemukan = False
 
-        # Ambil ringkasan utama
         if data.get("AbstractText"):
             hasil += f"{data['AbstractText']}\n\n"
             if data.get("AbstractURL"):
                 hasil += f"🔗 Sumber: {data['AbstractURL']}\n"
             ditemukan = True
 
-        # Ambil topik terkait jika ringkasan utama kosong
         elif data.get("RelatedTopics") and len(data["RelatedTopics"]) > 0:
-            hasil += "**Topik Terkait:**\n"
+            hasil += "**Informasi Terkait:**\n"
             for idx, topik in enumerate(data["RelatedTopics"][:3], 1):
                 if "Text" in topik:
                     hasil += f"{idx}. {topik['Text']}\n"
@@ -179,11 +176,11 @@ def cari_informasi(kueri: str) -> str:
         if ditemukan:
             return hasil
         else:
-            return "🔍 Saya sudah mencari, namun belum menemukan informasi yang cukup spesifik. Silakan gunakan kata kunci yang lebih jelas atau tanya hal lain."
+            return "🔍 Silakan perjelas pertanyaan Anda agar saya bisa mencari informasi yang lebih tepat."
 
     except Exception as e:
         logger.warning(f"⚠️ DuckDuckGo gagal: {str(e)}")
-        return "❌ Maaf, layanan pencarian sedang tidak dapat diakses saat ini."
+        return "❌ Layanan pencarian sedang tidak tersedia saat ini."
 
 # ==========================================
 # FUNGSI UTAMA
@@ -191,24 +188,30 @@ def cari_informasi(kueri: str) -> str:
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
-    # Deteksi perintah khusus - diperluas agar lebih akurat
+    # Deteksi perintah khusus
     if teks.startswith((
         "buat gambar", "gambarkan", "buatkan gambar", "tampilkan gambar",
-        "buatkan saya gambar", "bikin gambar"
+        "bikin gambar", "gambar"
     )):
         return buat_gambar(pertanyaan)
     
-    if teks.startswith((
+    # Daftar kata kunci untuk memicu pencarian otomatis
+    kata_kunci_cari = [
         "cari", "info terbaru", "berita", "jelaskan terbaru", "data terbaru",
-        "apa itu", "siapa itu", "dimana", "kapan", "berapa", "informasi tentang",
-        "update terbaru", "laporan terbaru", "perkembangan", "harga saat ini",
-        "cuaca di", "lokasi", "sejarah", "definisi"
-    )):
+        "siapa presiden", "kepala negara", "perdana menteri", "presiden indonesia",
+        "berapa harga", "kurs", "nilai tukar", "cuaca", "suhu", "iklim",
+        "berita hari ini", "update", "terkini", "saat ini", "sekarang",
+        "hasil", "kemenangan", "perkembangan", "status", "jumlah", "statistik"
+    ]
+
+    # Cek apakah butuh pencarian
+    butuh_cari = any(kata in teks for kata in kata_kunci_cari)
+    if butuh_cari:
         return cari_informasi(pertanyaan)
 
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
-    # 1. Coba OpenRouter
+    # 1. OpenRouter
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
@@ -231,7 +234,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
-    # 2. Coba Groq
+    # 2. Groq
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
@@ -243,7 +246,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
 
-    # 3. Coba Gemini
+    # 3. Gemini
     if client_gemini and model_gemini:
         try:
             res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
@@ -252,7 +255,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Gemini gagal: {str(e)}")
 
-    # 4. Coba Mistral
+    # 4. Mistral
     if MISTRAL_API_KEY:
         try:
             res = requests.post(
@@ -262,11 +265,11 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
                 timeout=25
             )
             res.raise_for_status()
-            return res.json()["choices"][0]["message"]["content"].strip()
+            return res.json()["choices"][0]["message"].strip()
         except Exception as e:
             logger.warning(f"⚠️ Mistral gagal: {str(e)}")
 
-    return "❌ Maaf, semua layanan sedang tidak tersedia. Silakan coba lagi nanti."
+    return "❌ Maaf, layanan sedang tidak tersedia saat ini."
 
 class PesanMasuk(BaseModel):
     pesan: str
