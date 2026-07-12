@@ -6,11 +6,13 @@ from pydantic import BaseModel
 import os
 import logging
 import requests
+import base64
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.3.0")
+app = FastAPI(title="Alina AI", version="1.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,12 +34,15 @@ Aturan wajib:
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
 3. Jangan menyebutkan nama model atau layanan AI luar.
 4. Jawab secara lengkap dan bermanfaat.
+5. Jika diminta membuat gambar atau mencari informasi terbaru, laksanakan sesuai kemampuan yang tersedia.
 """
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
+
+SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
 model_gemini = None
 if GEMINI_API_KEY:
@@ -58,7 +63,83 @@ if GROQ_API_KEY:
 
 model_mistral = "mistral-tiny"
 
+def buat_gambar(deskripsi: str) -> str:
+    if not OPENROUTER_API_KEY:
+        return "❌ Fitur pembuatan gambar belum dikonfigurasi."
+    try:
+        res = requests.post(
+            "https://openrouter.ai/api/v1/images/generations",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "HTTP-Referer": "https://alina.id",
+                "X-Title": "Alina AI",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "stabilityai/stable-diffusion-xl-base-1.0",
+                "prompt": deskripsi + ", gaya berkualitas tinggi, detail jelas",
+                "n": 1,
+                "size": "1024x1024"
+            },
+            timeout=30
+        )
+        res.raise_for_status()
+        data = res.json()
+        url_gambar = data["data"][0]["url"]
+        return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar]({url_gambar})"
+    except Exception as e:
+        logger.warning(f"Gagal buat gambar: {str(e)}")
+        return "❌ Maaf, tidak dapat membuat gambar saat ini. Coba deskripsi lain nanti."
+
+def cari_informasi(kueri: str) -> str:
+    if SERPAPI_KEY:
+        try:
+            res = requests.get(
+                "https://serpapi.com/search",
+                params={
+                    "q": kueri,
+                    "api_key": SERPAPI_KEY,
+                    "engine": "google",
+                    "hl": "id",
+                    "num": 3
+                },
+                timeout=20
+            )
+            res.raise_for_status()
+            data = res.json()
+            hasil = f"🔍 **Informasi Terbaru:**\n\n"
+            if "organic_results" in data:
+                for idx, item in enumerate(data["organic_results"][:3], 1):
+                    hasil += f"{idx}. **{item.get('title', '')}**\n{item.get('snippet', '')}\nSumber: {item.get('link', '')}\n\n"
+                return hasil
+        except Exception as e:
+            logger.warning(f"SerpApi gagal: {str(e)}")
+
+    try:
+        res = requests.get(
+            "https://api.duckduckgo.com/",
+            params={"q": kueri, "format": "json", "no_html": 1, "no_redirect": 1},
+            timeout=15
+        )
+        res.raise_for_status()
+        data = res.json()
+        if data.get("AbstractText"):
+            return f"🔍 **Informasi:**\n\n{data['AbstractText']}\n\nSumber: {data.get('AbstractURL', 'Tidak tersedia')}"
+        else:
+            return "🔍 Saya sudah cari, tapi ringkasan langsung tidak ditemukan. Silakan tanya secara lebih spesifik."
+    except Exception as e:
+        logger.warning(f"DuckDuckGo gagal: {str(e)}")
+        return "❌ Tidak dapat mengambil informasi terbaru saat ini."
+
 def dapatkan_jawaban(pertanyaan: str) -> str:
+    teks = pertanyaan.strip().lower()
+
+    if teks.startswith(("buat gambar", "gambarkan", "buatkan gambar", "tampilkan gambar")):
+        return buat_gambar(pertanyaan)
+    
+    if teks.startswith(("cari", "info terbaru", "berita", "jelaskan terbaru", "data terbaru")):
+        return cari_informasi(pertanyaan)
+
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
     if OPENROUTER_API_KEY:
