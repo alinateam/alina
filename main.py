@@ -11,7 +11,7 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.4.2")
+app = FastAPI(title="Alina AI", version="1.4.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,19 +36,24 @@ Aturan wajib:
 5. Jika diminta membuat gambar atau mencari informasi terbaru, laksanakan sesuai kemampuan yang tersedia.
 """
 
+# Kunci API
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
+# ==========================================
+# Inisialisasi Model
+# ==========================================
 model_gemini = None
+client_gemini = None
 if GEMINI_API_KEY:
     try:
         import google.genai as genai
         client_gemini = genai.Client(api_key=GEMINI_API_KEY)
-        model_gemini = "gemini-2.0-flash"
-        logger.info("✅ Gemini berhasil dimuat dengan pustaka baru")
+        model_gemini = "gemini-2.0-flash-lite"  # Pakai versi lebih ringan & kuota lebih banyak
+        logger.info("✅ Gemini berhasil dimuat")
     except Exception as e:
         logger.warning(f"⚠️ Gemini tidak dapat dimuat: {str(e)}")
 
@@ -61,8 +66,9 @@ if GROQ_API_KEY:
     except Exception as e:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
-model_mistral = "mistral-tiny"
-
+# ==========================================
+# FUNGSI: MEMBUAT GAMBAR
+# ==========================================
 def buat_gambar(deskripsi: str) -> str:
     if not OPENROUTER_API_KEY:
         return "❌ Fitur pembuatan gambar belum dikonfigurasi."
@@ -91,6 +97,9 @@ def buat_gambar(deskripsi: str) -> str:
         logger.warning(f"❌ Gagal buat gambar: {str(e)}")
         return "❌ Maaf, tidak dapat membuat gambar saat ini."
 
+# ==========================================
+# FUNGSI: CARI INFORMASI TERBARU
+# ==========================================
 def cari_informasi(kueri: str) -> str:
     if SERPAPI_KEY:
         try:
@@ -125,9 +134,13 @@ def cari_informasi(kueri: str) -> str:
         logger.warning(f"⚠️ DuckDuckGo gagal: {str(e)}")
         return "❌ Tidak dapat mengakses informasi terbaru saat ini."
 
+# ==========================================
+# FUNGSI UTAMA
+# ==========================================
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
+    # Deteksi perintah khusus
     if teks.startswith(("buat gambar", "gambarkan", "buatkan gambar", "tampilkan gambar")):
         return buat_gambar(pertanyaan)
     
@@ -136,6 +149,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
 
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
+    # 1. Coba OpenRouter (Model diperbaiki)
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
@@ -143,10 +157,11 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "HTTP-Referer": "https://alina.id",
-                    "X-Title": "Alina AI"
+                    "X-Title": "Alina AI",
+                    "Content-Type": "application/json"
                 },
                 json={
-                    "model": "google/gemini-flash-1.5",
+                    "model": "google/gemini-2.0-flash-lite-preview-02-05:free",  # Model gratis & aktif
                     "messages": [{"role": "user", "content": pesan_lengkap}],
                     "max_tokens": 2048
                 },
@@ -157,10 +172,11 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
+    # 2. Coba Groq (Model diganti yang baru)
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama3-8b-32768",  # Model pengganti yang aktif
                 messages=[{"role": "user", "content": pesan_lengkap}],
                 timeout=20
             )
@@ -168,7 +184,8 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
 
-    if GEMINI_API_KEY and model_gemini:
+    # 3. Coba Gemini (Versi lebih ringan)
+    if client_gemini and model_gemini:
         try:
             res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
             if res.text:
@@ -176,20 +193,21 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Gemini gagal: {str(e)}")
 
+    # 4. Coba Mistral dengan model lebih ringan
     if MISTRAL_API_KEY:
         try:
             res = requests.post(
                 "https://api.mistral.ai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
-                json={"model": model_mistral, "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 2048},
-                timeout=20
+                json={"model": "mistral-small-latest", "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 2048},
+                timeout=25
             )
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
             logger.warning(f"⚠️ Mistral gagal: {str(e)}")
 
-    return "❌ Maaf, semua layanan AI belum dikonfigurasi atau sedang tidak tersedia. Pastikan setidaknya salah satu kunci API (OpenRouter/Groq/Gemini/Mistral) sudah dimasukkan dengan benar."
+    return "❌ Maaf, semua layanan sedang tidak tersedia. Silakan coba lagi nanti atau gunakan kunci API yang aktif."
 
 class PesanMasuk(BaseModel):
     pesan: str
