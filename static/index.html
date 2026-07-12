@@ -409,16 +409,18 @@
         });
     }
 
+    // ✅ Format teks diperbarui: dukung gambar, tautan, dan format pencarian
     function formatTeksMarkdown(teks) {
         return teks
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`(.*?)`/g, '<code>$1</code>')
             .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-            .replace(/!\[Gambar\]\((.*?)\)/g, '<img src="$1" alt="Gambar hasil buatan Alina" loading="lazy">')
-            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" loading="lazy">')
+            .replace(/!\[Gambar\]\((.*?)\)/g, '<img src="$1" alt="Gambar hasil buatan Alina" loading="lazy" onclick="window.open(this.src, \'_blank\')">')
+            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" loading="lazy" onclick="window.open(this.src, \'_blank\')">')
+            .replace(/🔗 (https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" class="text-alina hover:underline">🔗 Buka Sumber</a>')
             .replace(/^- (.*)$/gm, '<li>$1</li>')
-            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            .replace(/(<li>.*<\/li>)/s, '<ul class="list-disc pl-5 my-2"></ul>$1')
             .replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>')
             .replace(/\n/g, '<br>');
     }
@@ -469,6 +471,7 @@
         if (!teks) return;
         if (!penggunaSaatIni) return alert("Silakan masuk atau daftar terlebih dahulu untuk mengirim pesan!");
 
+        // ✅ Tampilkan pesan pengguna dengan benar
         tambahPesanKeLayar(teks, 'pengguna');
         pesanInput.value = '';
         tambahPesanKeLayar('Sedang mengetik...', 'alina');
