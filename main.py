@@ -3,11 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.responses import HTMLResponse
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
@@ -20,14 +22,16 @@ from jose import JWTError, jwt
 import os
 import base64
 import requests
+import uvicorn
 from bs4 import BeautifulSoup
 import fitz
 from PIL import Image
 import io
 import logging
-
 from dotenv import load_dotenv
 load_dotenv()
+
+app = FastAPI()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -188,6 +192,7 @@ app.mount("/src/assets", StaticFiles(directory="src/assets", html=False), name="
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+templates = Jinja2Templates(directory="templates")
 
 app.add_middleware(
     CORSMiddleware,
@@ -299,6 +304,9 @@ async def masuk(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 @app.get("/")
 async def halaman_utama():
     return FileResponse("static/index.html")
+    with open("static/index.html", "r", encoding="utf-8") as f:
+    return f.read()
+
 
 @app.post("/api/tanya")
 async def tanya_alina(data: PesanMasuk):
