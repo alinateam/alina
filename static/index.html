@@ -39,7 +39,7 @@
             .dark .scrollbar-thin::-webkit-scrollbar-thumb {
                 background-color: #4b5563;
             }
-            /* Gaya untuk format teks */
+            /* Gaya format teks */
             .prose strong { font-weight: 700; }
             .prose em { font-style: italic; }
             .prose code {
@@ -66,21 +66,78 @@
                 margin: 8px 0;
             }
             .dark .prose blockquote { border-color: #475569; color: #94a3b8; }
+            /* Modal */
+            .modal {
+                background: rgba(0,0,0,0.6);
+                display: none;
+            }
+            .modal.active {
+                display: flex;
+            }
         }
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-inter">
 
+<div id="modalAkun" class="modal fixed inset-0 z-50 items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6 mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 id="judulModal" class="text-xl font-bold">Masuk ke Akun</h3>
+            <button onclick="tutupModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+
+        <div id="formLogin">
+            <div class="mb-3">
+                <label class="block text-sm mb-1">Email</label>
+                <input type="email" id="loginEmail" class="w-full px-3 py-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm mb-1">Kata Sandi</label>
+                <input type="password" id="loginSandi" class="w-full px-3 py-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" required>
+            </div>
+            <button onclick="prosesLogin()" class="w-full bg-alina hover:bg-alinaDark text-white py-2 rounded mb-3">Masuk</button>
+            <p class="text-center text-sm">Belum punya akun? <a href="#" onclick="tukarForm()" class="text-alina font-medium">Daftar di sini</a></p>
+        </div>
+
+        <div id="formDaftar" class="hidden">
+            <div class="mb-3">
+                <label class="block text-sm mb-1">Nama Lengkap</label>
+                <input type="text" id="daftarNama" class="w-full px-3 py-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" required>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm mb-1">Email</label>
+                <input type="email" id="daftarEmail" class="w-full px-3 py-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" required>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm mb-1">Kata Sandi</label>
+                <input type="password" id="daftarSandi" class="w-full px-3 py-2 border rounded bg-gray-50 dark:bg-gray-700 dark:border-gray-600" required>
+            </div>
+            <button onclick="prosesDaftar()" class="w-full bg-alina hover:bg-alinaDark text-white py-2 rounded mb-3">Buat Akun</button>
+            <p class="text-center text-sm">Sudah punya akun? <a href="#" onclick="tukarForm()" class="text-alina font-medium">Masuk di sini</a></p>
+        </div>
+    </div>
+</div>
+
 <div id="app" class="flex h-screen max-w-7xl mx-auto shadow-lg">
 
     <aside class="w-72 bg-sidebar dark:bg-sidebarDark border-r border-gray-200 dark:border-gray-700 flex flex-col">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-3 mb-6">
+            <div class="flex items-center gap-3 mb-4">
                 <div class="w-10 h-10 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden">
                     <img src="/static/assets/logo.png" alt="Logo Alina" class="w-full h-full object-contain">
                 </div>
                 <h2 class="text-lg font-bold">Alina AI</h2>
             </div>
+
+            <div id="infoPengguna" class="mb-4 text-sm text-gray-600 dark:text-gray-300 hidden">
+                <p>Halo, <span id="namaPengguna"></span></p>
+                <button onclick="keluarAkun()" class="text-red-500 text-xs mt-1 hover:underline">Keluar</button>
+            </div>
+            <button id="tombolMasuk" onclick="bukaModal()" class="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg py-2 px-3 mb-4">
+                <i class="fa fa-user mr-2"></i> Masuk / Daftar
+            </button>
 
             <button id="obrolanBaru" class="w-full bg-alina hover:bg-alinaDark text-white rounded-lg py-2 px-3 flex items-center justify-center gap-2">
                 <i class="fa fa-plus"></i> Obrolan Baru
@@ -90,6 +147,7 @@
         <div class="flex-1 p-3 overflow-y-auto scrollbar-thin">
             <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Riwayat Obrolan</h3>
             <div id="daftarRiwayat" class="space-y-1">
+                <div class="text-xs text-gray-400 text-center py-4">Masuk untuk melihat riwayat</div>
             </div>
         </div>
 
@@ -133,6 +191,7 @@
 <script>
     const API_DASAR = "/api";
     let percakapanAktifId = null;
+    let penggunaSaatIni = null;
 
     const modeToggle = document.getElementById('modeToggle');
     if (localStorage.getItem('mode') === 'gelap' || 
@@ -144,89 +203,178 @@
         localStorage.setItem('mode', document.documentElement.classList.contains('dark') ? 'gelap' : 'terang');
     });
 
-    function dapatkanSemuaRiwayat() {
-        return JSON.parse(localStorage.getItem('riwayatObrolan')) || [];
+    function bukaModal() {
+        document.getElementById('modalAkun').classList.add('active');
+    }
+    function tutupModal() {
+        document.getElementById('modalAkun').classList.remove('active');
+    }
+    function tukarForm() {
+        const formLogin = document.getElementById('formLogin');
+        const formDaftar = document.getElementById('formDaftar');
+        const judul = document.getElementById('judulModal');
+        if (formLogin.classList.contains('hidden')) {
+            formLogin.classList.remove('hidden');
+            formDaftar.classList.add('hidden');
+            judul.textContent = "Masuk ke Akun";
+        } else {
+            formLogin.classList.add('hidden');
+            formDaftar.classList.remove('hidden');
+            judul.textContent = "Daftar Akun Baru";
+        }
     }
 
-    function simpanSemuaRiwayat(daftar) {
-        localStorage.setItem('riwayatObrolan', JSON.stringify(daftar));
+    function prosesDaftar() {
+        const nama = document.getElementById('daftarNama').value.trim();
+        const email = document.getElementById('daftarEmail').value.trim().toLowerCase();
+        const sandi = document.getElementById('daftarSandi').value.trim();
+        if (!nama || !email || !sandi) return alert("Isi semua kolom!");
+
+        const daftarPengguna = JSON.parse(localStorage.getItem('penggunaAkun')) || [];
+        if (daftarPengguna.some(u => u.email === email)) return alert("Email sudah terdaftar!");
+
+        const akunBaru = { id: Date.now().toString(), nama, email, sandi, riwayat: [] };
+        daftarPengguna.push(akunBaru);
+        localStorage.setItem('penggunaAkun', JSON.stringify(daftarPengguna));
+        alert("Pendaftaran berhasil! Silakan masuk.");
+        tukarForm();
+    }
+
+    function prosesLogin() {
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const sandi = document.getElementById('loginSandi').value.trim();
+        if (!email || !sandi) return alert("Isi email dan sandi!");
+
+        const daftarPengguna = JSON.parse(localStorage.getItem('penggunaAkun')) || [];
+        const ditemukan = daftarPengguna.find(u => u.email === email && u.sandi === sandi);
+        if (!ditemukan) return alert("Email atau sandi salah!");
+
+        penggunaSaatIni = ditemukan;
+        localStorage.setItem('sesiPengguna', ditemukan.id);
+        tampilkanInfoPengguna();
+        tutupModal();
+        renderRiwayat();
+    }
+
+    function keluarAkun() {
+        if (!confirm("Yakin ingin keluar?")) return;
+        penggunaSaatIni = null;
+        localStorage.removeItem('sesiPengguna');
+        document.getElementById('infoPengguna').classList.add('hidden');
+        document.getElementById('tombolMasuk').classList.remove('hidden');
+        document.getElementById('chatArea').innerHTML = `
+            <div class="flex gap-3 max-w-[90%]">
+                <div class="w-8 h-8 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 mt-1">
+                    <img src="/static/assets/karakter.png" alt="Alina" class="w-full h-full object-contain">
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-3 shadow-sm prose">
+                    <p>Halo! Saya Alina AI. Silakan masuk atau daftar untuk menyimpan percakapan Anda.</p>
+                </div>
+            </div>
+        `;
+        document.getElementById('daftarRiwayat').innerHTML = `<div class="text-xs text-gray-400 text-center py-4">Masuk untuk melihat riwayat</div>`;
+    }
+
+    function tampilkanInfoPengguna() {
+        document.getElementById('namaPengguna').textContent = penggunaSaatIni.nama;
+        document.getElementById('infoPengguna').classList.remove('hidden');
+        document.getElementById('tombolMasuk').classList.add('hidden');
+    }
+
+    function cekSesiAwal() {
+        const sesiId = localStorage.getItem('sesiPengguna');
+        if (!sesiId) return;
+        const daftarPengguna = JSON.parse(localStorage.getItem('penggunaAkun')) || [];
+        penggunaSaatIni = daftarPengguna.find(u => u.id === sesiId);
+        if (penggunaSaatIni) {
+            tampilkanInfoPengguna();
+            renderRiwayat();
+        }
+    }
+
+    function simpanPerubahanAkun() {
+        const daftar = JSON.parse(localStorage.getItem('penggunaAkun')) || [];
+        const index = daftar.findIndex(u => u.id === penggunaSaatIni.id);
+        if (index !== -1) {
+            daftar[index] = penggunaSaatIni;
+            localStorage.setItem('penggunaAkun', JSON.stringify(daftar));
+        }
     }
 
     function buatObrolanBaru(judul = "Obrolan Baru") {
+        if (!penggunaSaatIni) return alert("Silakan masuk terlebih dahulu!");
         const id = Date.now().toString();
         const obrolan = {
-            id,
-            judul,
-            pesan: [
-                { pengirim: "alina", teks: "Halo! Saya Alina AI. Ada yang bisa saya bantu hari ini?" }
-            ],
+            id, judul,
+            pesan: [{ pengirim: "alina", teks: "Halo! Saya Alina AI. Ada yang bisa saya bantu hari ini?" }],
             dibuatPada: new Date().toISOString()
         };
-        const daftar = dapatkanSemuaRiwayat();
-        daftar.unshift(obrolan);
-        simpanSemuaRiwayat(daftar);
+        penggunaSaatIni.riwayat.unshift(obrolan);
+        simpanPerubahanAkun();
         percakapanAktifId = id;
         renderRiwayat();
         tampilkanIsiObrolan(id);
     }
 
     function tampilkanIsiObrolan(id) {
-        const daftar = dapatkanSemuaRiwayat();
-        const obrolan = daftar.find(o => o.id === id);
+        if (!penggunaSaatIni) return;
+        const obrolan = penggunaSaatIni.riwayat.find(o => o.id === id);
         if (!obrolan) return;
-
         percakapanAktifId = id;
         chatArea.innerHTML = "";
-
-        obrolan.pesan.forEach(item => {
-            tambahPesanKeLayar(item.teks, item.pengirim, false);
-        });
+        obrolan.pesan.forEach(item => tambahPesanKeLayar(item.teks, item.pengirim, false));
     }
 
     function simpanPesanKeObrolan(teks, pengirim) {
+        if (!penggunaSaatIni) return;
         if (!percakapanAktifId) buatObrolanBaru();
-        const daftar = dapatkanSemuaRiwayat();
-        const index = daftar.findIndex(o => o.id === percakapanAktifId);
+        const index = penggunaSaatIni.riwayat.findIndex(o => o.id === percakapanAktifId);
         if (index === -1) return;
-
-        daftar[index].pesan.push({ pengirim, teks });
-        if (daftar[index].pesan.length === 2 && pengirim === "pengguna") {
+        penggunaSaatIni.riwayat[index].pesan.push({ pengirim, teks });
+        if (penggunaSaatIni.riwayat[index].pesan.length === 2 && pengirim === "pengguna") {
+            penggunaSaatIni.riwayat[index].judul = teks.slice(0, 25) + (teks.length > 25 ? "..." : "");
         }
-        simpanSemuaRiwayat(daftar);
+        simpanPerubahanAkun();
         renderRiwayat();
     }
 
     function hapusObrolan(id) {
-        const daftar = dapatkanSemuaRiwayat().filter(o => o.id !== id);
-        simpanSemuaRiwayat(daftar);
-        if (percakapanAktifId === id) buatObrolanBaru();
-        else renderRiwayat();
+        if (!penggunaSaatIni || !confirm("Hapus obrolan ini?")) return;
+        penggunaSaatIni.riwayat = penggunaSaatIni.riwayat.filter(o => o.id !== id);
+        simpanPerubahanAkun();
+        if (percakapanAktifId === id && penggunaSaatIni.riwayat.length > 0) {
+            tampilkanIsiObrolan(penggunaSaatIni.riwayat[0].id);
+        } else if (percakapanAktifId === id) {
+            percakapanAktifId = null;
+            chatArea.innerHTML = `<div class="flex gap-3 max-w-[90%]"><div class="w-8 h-8 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 mt-1"><img src="/static/assets/karakter.png" alt="Alina" class="w-full h-full object-contain"></div><div class="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-3 shadow-sm prose"><p>Halo! Saya Alina AI. Ada yang bisa saya bantu hari ini?</p></div></div>`;
+        }
+        renderRiwayat();
     }
 
     function gantiNamaObrolan(id) {
-        const daftar = dapatkanSemuaRiwayat();
-        const obrolan = daftar.find(o => o.id === id);
+        if (!penggunaSaatIni) return;
+        const obrolan = penggunaSaatIni.riwayat.find(o => o.id === id);
         if (!obrolan) return;
         const namaBaru = prompt("Masukkan nama baru:", obrolan.judul);
         if (namaBaru && namaBaru.trim() !== "") {
             obrolan.judul = namaBaru.trim();
-            simpanSemuaRiwayat(daftar);
-            if (percakapanAktifId === id) document.getElementById('judulObrolan').textContent = obrolan.judul;
+            simpanPerubahanAkun();
             renderRiwayat();
         }
     }
 
     function renderRiwayat() {
         const daftarEl = document.getElementById('daftarRiwayat');
-        const daftar = dapatkanSemuaRiwayat();
-        daftarEl.innerHTML = "";
-
-        if (daftar.length === 0) {
-            daftarEl.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">Belum ada riwayat</div>`;
+        if (!penggunaSaatIni) {
+            daftarEl.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">Masuk untuk melihat riwayat</div>`;
             return;
         }
-
-        daftar.forEach(obrolan => {
+        daftarEl.innerHTML = "";
+        if (penggunaSaatIni.riwayat.length === 0) {
+            daftarEl.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">Belum ada obrolan</div>`;
+            return;
+        }
+        penggunaSaatIni.riwayat.forEach(obrolan => {
             const el = document.createElement('div');
             el.className = `p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm group flex justify-between items-center ${
                 percakapanAktifId === obrolan.id ? 'bg-alina/10 text-alina dark:bg-alina/20' : 'bg-white dark:bg-gray-800'
@@ -287,7 +435,7 @@
 
         chatArea.appendChild(div);
         chatArea.scrollTop = chatArea.scrollHeight;
-        if (simpan) simpanPesanKeObrolan(teks, pengirim);
+        if (simpan && penggunaSaatIni) simpanPesanKeObrolan(teks, pengirim);
     }
 
     const chatArea = document.getElementById('chatArea');
@@ -295,16 +443,19 @@
     const pesanInput = document.getElementById('pesanInput');
     const tombolObrolanBaru = document.getElementById('obrolanBaru');
 
-    tombolObrolanBaru.addEventListener('click', () => buatObrolanBaru());
+    tombolObrolanBaru.addEventListener('click', () => {
+        if (!penggunaSaatIni) return alert("Silakan masuk atau daftar terlebih dahulu!");
+        buatObrolanBaru();
+    });
 
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const teks = pesanInput.value.trim();
         if (!teks) return;
+        if (!penggunaSaatIni) return alert("Silakan masuk atau daftar terlebih dahulu untuk mengirim pesan!");
 
         tambahPesanKeLayar(teks, 'pengguna');
         pesanInput.value = '';
-
         tambahPesanKeLayar('Sedang mengetik...', 'alina');
 
         try {
@@ -313,9 +464,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pesan: teks })
             });
-
             chatArea.removeChild(chatArea.lastChild);
-
             if (res.ok) {
                 const data = await res.json();
                 tambahPesanKeLayar(data.jawaban, 'alina');
@@ -329,12 +478,7 @@
         }
     });
 
-    if (dapatkanSemuaRiwayat().length === 0) {
-        buatObrolanBaru();
-    } else {
-        renderRiwayat();
-        tampilkanIsiObrolan(dapatkanSemuaRiwayat()[0].id);
-    }
+    cekSesiAwal();
 </script>
 </body>
 </html>
