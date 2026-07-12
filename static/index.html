@@ -176,7 +176,6 @@
         if (!obrolan) return;
 
         percakapanAktifId = id;
-        document.getElementById('judulObrolan').textContent = obrolan.judul;
         chatArea.innerHTML = "";
 
         obrolan.pesan.forEach(item => {
@@ -192,8 +191,6 @@
 
         daftar[index].pesan.push({ pengirim, teks });
         if (daftar[index].pesan.length === 2 && pengirim === "pengguna") {
-            daftar[index].judul = teks.slice(0, 25) + (teks.length > 25 ? "..." : "");
-            document.getElementById('judulObrolan').textContent = daftar[index].judul;
         }
         simpanSemuaRiwayat(daftar);
         renderRiwayat();
