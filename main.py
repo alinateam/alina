@@ -65,8 +65,9 @@ if GROQ_API_KEY:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
 def buat_gambar(deskripsi: str) -> str:
-    if not OPENROUTER_API_KEY:
-        return "❌ Fitur pembuatan gambar belum dikonfigurasi."
+    if not OPENROUTER_API_KEY or len(OPENROUTER_API_KEY) < 10:
+        return "❌ Fitur pembuatan gambar belum dikonfigurasi. Silakan masukkan kunci API OpenRouter terlebih dahulu."
+
     try:
         res = requests.post(
             "https://openrouter.ai/api/v1/images/generations",
@@ -78,19 +79,35 @@ def buat_gambar(deskripsi: str) -> str:
             },
             json={
                 "model": "stabilityai/stable-diffusion-xl-base-1.0",
-                "prompt": deskripsi + ", kualitas tinggi, tajam, detail jelas",
+                "prompt": f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, tidak ada cacat",
                 "n": 1,
-                "size": "1024x1024"
+                "size": "1024x1024",
+                "response_format": "url"
             },
-            timeout=30
+            timeout=45
         )
         res.raise_for_status()
         data = res.json()
-        url_gambar = data["data"][0]["url"]
-        return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar]({url_gambar})"
+
+        if "data" in data and len(data["data"]) > 0 and "url" in data["data"][0]:
+            url_gambar = data["data"][0]["url"]
+            return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Klik gambar untuk melihat ukuran penuh*"
+        else:
+            logger.warning(f"⚠️ Hasil pembuatan gambar tidak valid: {data}")
+            return "❌ Berhasil diproses, tapi gambar tidak dapat diambil. Silakan coba deskripsi lain."
+
+    except requests.exceptions.HTTPError as e:
+        logger.warning(f"⚠️ Kesalahan API OpenRouter: {str(e)}")
+        if res.status_code == 401:
+            return "❌ Kunci API OpenRouter tidak valid atau sudah kadaluarsa."
+        elif res.status_code == 402:
+            return "❌ Kuota penggunaan OpenRouter sudah habis."
+        else:
+            return "❌ Layanan pembuatan gambar sedang bermasalah. Silakan coba lagi nanti."
+
     except Exception as e:
-        logger.warning(f"❌ Gagal buat gambar: {str(e)}")
-        return "❌ Maaf, tidak dapat membuat gambar saat ini."
+        logger.warning(f"❌ Gagal membuat gambar: {str(e)}")
+        return "❌ Maaf, saya tidak dapat membuat gambar saat ini. Silakan coba deskripsi yang lebih sederhana."
 
 def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
