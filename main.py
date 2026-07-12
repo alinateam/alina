@@ -6,13 +6,11 @@ from pydantic import BaseModel
 import os
 import logging
 import requests
-import google.generativeai as genai
-from groq import Groq
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.2.0")
+app = FastAPI(title="Alina AI", version="1.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,11 +28,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 INSTRUKSI_SISTEM = """
 Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
 Aturan wajib:
-1. Jawab selalu dalam bahasa Indonesia yang jelas, sopan, lembut, dan mudah dimengerti.
-2. Jika ditanya siapa Anda atau siapa pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
-3. Jangan menyebutkan nama model, layanan, atau penyedia AI tertentu.
-4. Jawab secara lengkap, akurat, dan bermanfaat.
-5. Akhiri jawaban dengan kalimat penutup yang ramah dan mengajak melanjutkan percakapan.
+1. Jawab selalu dalam bahasa Indonesia yang sopan, lembut, dan mudah dimengerti.
+2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
+3. Jangan menyebutkan nama model atau layanan AI luar.
+4. Jawab secara lengkap dan bermanfaat.
 """
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -42,13 +39,22 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 
+model_gemini = None
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model_gemini = genai.GenerativeModel("gemini-2.0-flash")
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model_gemini = genai.GenerativeModel("gemini-2.0-flash")
+    except Exception as e:
+        logger.warning(f"Gemini tidak dapat dimuat: {str(e)}")
 
+client_groq = None
 if GROQ_API_KEY:
-    client_groq = Groq(api_key=GROQ_API_KEY)
-    model_groq = "llama3-8b-8192"
+    try:
+        from groq import Groq
+        client_groq = Groq(api_key=GROQ_API_KEY)
+    except Exception as e:
+        logger.warning(f"Groq tidak dapat dimuat: {str(e)}")
 
 model_mistral = "mistral-tiny"
 
@@ -74,26 +80,26 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            logger.warning(f"OpenRouter gagal: {str(e)} → lanjut ke Groq")
+            logger.warning(f"OpenRouter gagal: {str(e)}")
 
-    if GROQ_API_KEY:
+    if client_groq:
         try:
             res = client_groq.chat.completions.create(
-                model=model_groq,
+                model="llama3-8b-8192",
                 messages=[{"role": "user", "content": pesan_lengkap}],
                 timeout=20
             )
             return res.choices[0].message.content.strip()
         except Exception as e:
-            logger.warning(f"Groq gagal: {str(e)} → lanjut ke Gemini")
+            logger.warning(f"Groq gagal: {str(e)}")
 
-    if GEMINI_API_KEY:
+    if model_gemini:
         try:
             res = model_gemini.generate_content(pesan_lengkap)
             if res.text:
                 return res.text.strip()
         except Exception as e:
-            logger.warning(f"Gemini gagal: {str(e)} → lanjut ke Mistral")
+            logger.warning(f"Gemini gagal: {str(e)}")
 
     if MISTRAL_API_KEY:
         try:
@@ -110,9 +116,9 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            logger.error(f"Mistral juga gagal: {str(e)}")
+            logger.warning(f"Mistral gagal: {str(e)}")
 
-    return "❌ Maaf, layanan sedang sibuk atau mengalami gangguan. Silakan coba lagi sebentar ya."
+    return "❌ Maaf, layanan sedang tidak tersedia. Silakan coba lagi nanti."
 
 class PesanMasuk(BaseModel):
     pesan: str
