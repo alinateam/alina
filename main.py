@@ -12,7 +12,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.4.5")
+app = FastAPI(title="Alina AI", version="1.4.6")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,12 +29,12 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 INSTRUKSI_SISTEM = f"""
 Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
-Tanggal saat ini adalah {datetime.now().strftime('%d %B %Y')}.
+Tanggal saat ini: {datetime.now().strftime('%d %B %Y')}.
 Aturan wajib:
-1. Jawab selalu dalam bahasa Indonesia yang sopan, lembut, dan mudah dimengerti.
+1. Jawab selalu dalam bahasa Indonesia yang sopan, jelas, dan mudah dimengerti.
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
-3. Jika pertanyaan membutuhkan data terbaru, berita, atau keadaan saat ini, gunakan hasil pencarian yang disediakan.
-4. Jawab secara lengkap dan bermanfaat.
+3. Jawab dengan lengkap dan akurat sesuai pengetahuan terbaru.
+4. Jika tidak ada hasil pencarian, jawab berdasarkan data yang Anda miliki.
 """
 
 # Kunci API
@@ -99,14 +99,13 @@ def buat_gambar(deskripsi: str) -> str:
         return "❌ Maaf, tidak dapat membuat gambar saat ini."
 
 # ==========================================
-# FUNGSI: CARI INFORMASI TERBARU / BROWSING
+# FUNGSI: CARI INFORMASI TERBARU
 # ==========================================
-def cari_informasi(kueri: str) -> str:
-    # Tambahkan konteks agar hasil lebih relevan
+def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
 
-    # Opsi 1: Pakai SerpApi jika ada kuncinya (hasil paling lengkap & akurat)
-    if SERPAPI_KEY and SERPAPI_KEY.strip():
+    # SerpApi
+    if SERPAPI_KEY and len(SERPAPI_KEY) > 10:
         try:
             res = requests.get(
                 "https://serpapi.com/search",
@@ -116,84 +115,41 @@ def cari_informasi(kueri: str) -> str:
                     "engine": "google",
                     "hl": "id",
                     "gl": "id",
-                    "num": 5
+                    "num": 3
                 },
                 timeout=20
             )
             res.raise_for_status()
             data = res.json()
 
-            hasil = "🔍 **Informasi Terbaru:**\n\n"
-
-            # Ambil jawaban langsung jika ada
             if "answer_box" in data and data["answer_box"].get("snippet"):
-                hasil += f"**Jawaban:**\n{data['answer_box']['snippet']}\n\n"
-                if "link" in data["answer_box"]:
-                    hasil += f"🔗 Sumber: {data['answer_box']['link']}\n\n"
+                return f"🔍 **Informasi Terbaru:**\n\n{data['answer_box']['snippet']}\n\n🔗 Sumber: {data['answer_box'].get('link', 'Tidak tersedia')}"
 
-            # Ambil hasil pencarian utama
             if "organic_results" in data and len(data["organic_results"]) > 0:
-                if "Jawaban:" not in hasil:
-                    hasil += "**Ringkasan Hasil:**\n"
-                for idx, item in enumerate(data["organic_results"][:3], 1):
-                    judul = item.get("title", "Tanpa Judul")
-                    ringkasan = item.get("snippet", "Tidak ada ringkasan")
-                    tautan = item.get("link", "#")
-                    hasil += f"{idx}. **{judul}**\n{ringkasan}\n🔗 {tautan}\n\n"
+                hasil = "🔍 **Informasi Terbaru:**\n\n"
+                for idx, item in enumerate(data["organic_results"][:2], 1):
+                    hasil += f"{idx}. **{item.get('title','')}**\n{item.get('snippet','')}\n🔗 {item.get('link','')}\n\n"
                 return hasil
-
-            return "🔍 Pencarian selesai, berikut informasi yang ditemukan:\n\n" + hasil
 
         except Exception as e:
             logger.warning(f"⚠️ SerpApi gagal: {str(e)}")
 
-    # Opsi 2: Cadangan - Pakai DuckDuckGo dengan format yang lebih baik
+    # DuckDuckGo cadangan
     try:
         res = requests.get(
             "https://api.duckduckgo.com/",
-            params={
-                "q": kueri_lengkap,
-                "format": "json",
-                "no_html": 1,
-                "no_redirect": 1,
-                "skip_disambig": 1,
-                "kl": "id-id"
-            },
+            params={"q": kueri_lengkap, "format": "json", "no_html": 1, "no_redirect": 1, "kl": "id-id"},
             timeout=15
         )
         res.raise_for_status()
         data = res.json()
-
-        hasil = "🔍 **Informasi yang Ditemukan:**\n\n"
-        ditemukan = False
-
-        # Ambil jawaban utama
         if data.get("AbstractText"):
-            hasil += f"{data['AbstractText']}\n\n"
-            if data.get("AbstractURL"):
-                hasil += f"🔗 Sumber: {data['AbstractURL']}\n"
-            ditemukan = True
-
-        # Jika tidak ada jawaban utama, ambil topik terkait
-        elif data.get("RelatedTopics") and len(data["RelatedTopics"]) > 0:
-            hasil += "**Informasi Terkait:**\n"
-            for idx, topik in enumerate(data["RelatedTopics"][:3], 1):
-                if "Text" in topik:
-                    hasil += f"{idx}. {topik['Text']}\n"
-                    if "FirstURL" in topik:
-                        hasil += f"🔗 {topik['FirstURL']}\n\n"
-            ditemukan = True
-
-        # Jika tetap tidak ada hasil, kembalikan ke model AI untuk menjawab berdasarkan pengetahuannya
-        if ditemukan:
-            return hasil
-        else:
-            logger.info("⚠️ Tidak ada hasil pencarian, gunakan jawaban bawaan AI")
-            return None  # Mengembalikan None agar sistem beralih ke jawaban model
-
+            return f"🔍 **Informasi:**\n\n{data['AbstractText']}\n\n🔗 Sumber: {data.get('AbstractURL', 'Tidak tersedia')}"
     except Exception as e:
         logger.warning(f"⚠️ DuckDuckGo gagal: {str(e)}")
-        return None
+
+    logger.info("⚠️ Tidak ada hasil pencarian, lanjut ke jawaban AI")
+    return None
 
 # ==========================================
 # FUNGSI UTAMA
@@ -201,45 +157,37 @@ def cari_informasi(kueri: str) -> str:
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
-    # Deteksi perintah gambar
-    if teks.startswith((
-        "buat gambar", "gambarkan", "buatkan gambar", "tampilkan gambar",
-        "bikin gambar", "gambar"
-    )):
+    if teks.startswith(("buat gambar", "gambarkan", "bikin gambar")):
         return buat_gambar(pertanyaan)
-    
-    # Daftar kata kunci yang memicu pencarian
+
     kata_kunci_cari = [
-        "cari", "info terbaru", "berita", "jelaskan terbaru", "data terbaru",
-        "siapa presiden", "kepala negara", "presiden indonesia", "wakil presiden",
-        "berapa harga", "kurs", "nilai tukar", "cuaca", "suhu", "iklim",
-        "berita hari ini", "update", "terkini", "saat ini", "sekarang",
-        "hasil", "kemenangan", "perkembangan", "status", "jumlah", "statistik",
-        "kapan", "dimana", "tanggal", "hari ini", "bulan ini", "tahun ini"
+        "cari", "info terbaru", "berita", "data terbaru",
+        "siapa presiden", "presiden indonesia", "wakil presiden",
+        "saat ini", "sekarang", "hari ini", "bulan ini", "tahun ini",
+        "berapa harga", "kurs", "cuaca", "statistik", "jumlah"
     ]
 
-    # Cek apakah butuh pencarian
     butuh_cari = any(kata in teks for kata in kata_kunci_cari)
-    hasil_cari = None
     if butuh_cari:
         hasil_cari = cari_informasi(pertanyaan)
         if hasil_cari:
             return hasil_cari
 
-    # Jika pencarian tidak memberi hasil, lanjutkan ke jawaban model
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
-    # 1. Coba OpenRouter
+    # 1. OpenRouter (model diperbaiki)
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "HTTP-Referer": "https://alina.id",
+                    "X-Title": "Alina AI",
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "google/gemini-flash-1.5",
+                    "model": "google/gemini-2.0-flash-lite-preview-02-05:free",
                     "messages": [{"role": "user", "content": pesan_lengkap}],
                     "max_tokens": 1024
                 },
@@ -250,19 +198,17 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
-    # 2. Coba Groq
+    # 2. Groq (model diganti yang aktif)
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama3-8b-32768",  # ✅ Model baru yang aktif
                 messages=[{"role": "user", "content": pesan_lengkap}],
-                max_tokens=1024
+                timeout=20
             )
             return res.choices[0].message.content.strip()
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
-
-    return "❌ Maaf, saya tidak dapat menjawab pertanyaan ini saat ini."
 
     # 3. Gemini
     if client_gemini and model_gemini:
@@ -279,15 +225,15 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             res = requests.post(
                 "https://api.mistral.ai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
-                json={"model": "mistral-small-latest", "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 2048},
+                json={"model": "mistral-small-latest", "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 1024},
                 timeout=25
             )
             res.raise_for_status()
-            return res.json()["choices"][0]["message"].strip()
+            return res.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
             logger.warning(f"⚠️ Mistral gagal: {str(e)}")
 
-    return "❌ Maaf, layanan sedang tidak tersedia saat ini."
+    return "❌ Maaf, saat ini tidak dapat memproses permintaan. Silakan coba lagi nanti."
 
 class PesanMasuk(BaseModel):
     pesan: str
