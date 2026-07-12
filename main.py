@@ -6,13 +6,12 @@ from pydantic import BaseModel
 import os
 import logging
 import requests
-import base64
 import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.4.0")
+app = FastAPI(title="Alina AI", version="1.4.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,7 +40,6 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
-
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
 model_gemini = None
@@ -65,7 +63,7 @@ model_mistral = "mistral-tiny"
 
 def buat_gambar(deskripsi: str) -> str:
     if not OPENROUTER_API_KEY:
-        return "❌ Fitur pembuatan gambar belum dikonfigurasi."
+        return "❌ Fitur gambar belum dikonfigurasi."
     try:
         res = requests.post(
             "https://openrouter.ai/api/v1/images/generations",
@@ -77,7 +75,7 @@ def buat_gambar(deskripsi: str) -> str:
             },
             json={
                 "model": "stabilityai/stable-diffusion-xl-base-1.0",
-                "prompt": deskripsi + ", gaya berkualitas tinggi, detail jelas",
+                "prompt": deskripsi + ", kualitas tinggi, tajam",
                 "n": 1,
                 "size": "1024x1024"
             },
@@ -86,31 +84,25 @@ def buat_gambar(deskripsi: str) -> str:
         res.raise_for_status()
         data = res.json()
         url_gambar = data["data"][0]["url"]
-        return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar]({url_gambar})"
+        return f"✅ Berikut gambarnya:\n\n![Gambar]({url_gambar})"
     except Exception as e:
         logger.warning(f"Gagal buat gambar: {str(e)}")
-        return "❌ Maaf, tidak dapat membuat gambar saat ini. Coba deskripsi lain nanti."
+        return "❌ Tidak dapat membuat gambar saat ini."
 
 def cari_informasi(kueri: str) -> str:
     if SERPAPI_KEY:
         try:
             res = requests.get(
                 "https://serpapi.com/search",
-                params={
-                    "q": kueri,
-                    "api_key": SERPAPI_KEY,
-                    "engine": "google",
-                    "hl": "id",
-                    "num": 3
-                },
+                params={"q": kueri, "api_key": SERPAPI_KEY, "engine": "google", "hl": "id", "num": 3},
                 timeout=20
             )
             res.raise_for_status()
             data = res.json()
-            hasil = f"🔍 **Informasi Terbaru:**\n\n"
+            hasil = "🔍 **Informasi Terbaru:**\n\n"
             if "organic_results" in data:
                 for idx, item in enumerate(data["organic_results"][:3], 1):
-                    hasil += f"{idx}. **{item.get('title', '')}**\n{item.get('snippet', '')}\nSumber: {item.get('link', '')}\n\n"
+                    hasil += f"{idx}. **{item.get('title','')}**\n{item.get('snippet','')}\nSumber: {item.get('link','')}\n\n"
                 return hasil
         except Exception as e:
             logger.warning(f"SerpApi gagal: {str(e)}")
@@ -126,10 +118,10 @@ def cari_informasi(kueri: str) -> str:
         if data.get("AbstractText"):
             return f"🔍 **Informasi:**\n\n{data['AbstractText']}\n\nSumber: {data.get('AbstractURL', 'Tidak tersedia')}"
         else:
-            return "🔍 Saya sudah cari, tapi ringkasan langsung tidak ditemukan. Silakan tanya secara lebih spesifik."
+            return "🔍 Silakan perjelas pertanyaan Anda agar saya bisa cari informasi yang sesuai."
     except Exception as e:
         logger.warning(f"DuckDuckGo gagal: {str(e)}")
-        return "❌ Tidak dapat mengambil informasi terbaru saat ini."
+        return "❌ Tidak dapat mengakses informasi terbaru."
 
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
@@ -156,7 +148,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
                     "messages": [{"role": "user", "content": pesan_lengkap}],
                     "max_tokens": 2048
                 },
-                timeout=20
+                timeout=25
             )
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
@@ -187,11 +179,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             res = requests.post(
                 "https://api.mistral.ai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
-                json={
-                    "model": model_mistral,
-                    "messages": [{"role": "user", "content": pesan_lengkap}],
-                    "max_tokens": 2048
-                },
+                json={"model": model_mistral, "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 2048},
                 timeout=20
             )
             res.raise_for_status()
@@ -199,7 +187,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"Mistral gagal: {str(e)}")
 
-    return "❌ Maaf, layanan sedang tidak tersedia. Silakan coba lagi nanti."
+    return "❌ Maaf, semua layanan sedang tidak tersedia. Silakan coba lagi nanti atau periksa konfigurasi kunci API."
 
 class PesanMasuk(BaseModel):
     pesan: str
