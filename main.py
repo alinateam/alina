@@ -99,21 +99,24 @@ def buat_gambar(deskripsi: str) -> str:
         return "❌ Maaf, tidak dapat membuat gambar saat ini."
 
 # ==========================================
-# FUNGSI: CARI INFORMASI TERBARU
+# FUNGSI: CARI INFORMASI TERBARU / BROWSING
 # ==========================================
 def cari_informasi(kueri: str) -> str:
-    # Opsi 1: SerpApi
+    # Tambahkan konteks agar hasil lebih relevan
+    kueri_lengkap = f"{kueri} Indonesia terbaru"
+
+    # Opsi 1: Pakai SerpApi jika ada kuncinya (hasil paling lengkap & akurat)
     if SERPAPI_KEY and SERPAPI_KEY.strip():
         try:
             res = requests.get(
                 "https://serpapi.com/search",
                 params={
-                    "q": f"{kueri} Indonesia",
+                    "q": kueri_lengkap,
                     "api_key": SERPAPI_KEY,
                     "engine": "google",
                     "hl": "id",
                     "gl": "id",
-                    "num": 4
+                    "num": 5
                 },
                 timeout=20
             )
@@ -122,11 +125,16 @@ def cari_informasi(kueri: str) -> str:
 
             hasil = "🔍 **Informasi Terbaru:**\n\n"
 
+            # Ambil jawaban langsung jika ada
             if "answer_box" in data and data["answer_box"].get("snippet"):
-                hasil += f"**Jawaban Singkat:**\n{data['answer_box']['snippet']}\n\n"
+                hasil += f"**Jawaban:**\n{data['answer_box']['snippet']}\n\n"
+                if "link" in data["answer_box"]:
+                    hasil += f"🔗 Sumber: {data['answer_box']['link']}\n\n"
 
+            # Ambil hasil pencarian utama
             if "organic_results" in data and len(data["organic_results"]) > 0:
-                hasil += "**Sumber Informasi:**\n"
+                if "Jawaban:" not in hasil:
+                    hasil += "**Ringkasan Hasil:**\n"
                 for idx, item in enumerate(data["organic_results"][:3], 1):
                     judul = item.get("title", "Tanpa Judul")
                     ringkasan = item.get("snippet", "Tidak ada ringkasan")
@@ -134,21 +142,22 @@ def cari_informasi(kueri: str) -> str:
                     hasil += f"{idx}. **{judul}**\n{ringkasan}\n🔗 {tautan}\n\n"
                 return hasil
 
-            return "🔍 Pencarian selesai, namun tidak ditemukan hasil yang relevan."
+            return "🔍 Pencarian selesai, berikut informasi yang ditemukan:\n\n" + hasil
 
         except Exception as e:
             logger.warning(f"⚠️ SerpApi gagal: {str(e)}")
 
-    # Opsi 2: DuckDuckGo
+    # Opsi 2: Cadangan - Pakai DuckDuckGo dengan format yang lebih baik
     try:
         res = requests.get(
             "https://api.duckduckgo.com/",
             params={
-                "q": kueri,
+                "q": kueri_lengkap,
                 "format": "json",
                 "no_html": 1,
                 "no_redirect": 1,
-                "skip_disambig": 1
+                "skip_disambig": 1,
+                "kl": "id-id"
             },
             timeout=15
         )
@@ -158,12 +167,14 @@ def cari_informasi(kueri: str) -> str:
         hasil = "🔍 **Informasi yang Ditemukan:**\n\n"
         ditemukan = False
 
+        # Ambil jawaban utama
         if data.get("AbstractText"):
             hasil += f"{data['AbstractText']}\n\n"
             if data.get("AbstractURL"):
                 hasil += f"🔗 Sumber: {data['AbstractURL']}\n"
             ditemukan = True
 
+        # Jika tidak ada jawaban utama, ambil topik terkait
         elif data.get("RelatedTopics") and len(data["RelatedTopics"]) > 0:
             hasil += "**Informasi Terkait:**\n"
             for idx, topik in enumerate(data["RelatedTopics"][:3], 1):
@@ -173,14 +184,16 @@ def cari_informasi(kueri: str) -> str:
                         hasil += f"🔗 {topik['FirstURL']}\n\n"
             ditemukan = True
 
+        # Jika tetap tidak ada hasil, kembalikan ke model AI untuk menjawab berdasarkan pengetahuannya
         if ditemukan:
             return hasil
         else:
-            return "🔍 Silakan perjelas pertanyaan Anda agar saya bisa mencari informasi yang lebih tepat."
+            logger.info("⚠️ Tidak ada hasil pencarian, gunakan jawaban bawaan AI")
+            return None  # Mengembalikan None agar sistem beralih ke jawaban model
 
     except Exception as e:
         logger.warning(f"⚠️ DuckDuckGo gagal: {str(e)}")
-        return "❌ Layanan pencarian sedang tidak tersedia saat ini."
+        return None
 
 # ==========================================
 # FUNGSI UTAMA
