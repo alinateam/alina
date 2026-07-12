@@ -11,7 +11,7 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.4.1")
+app = FastAPI(title="Alina AI", version="1.4.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,25 +45,27 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 model_gemini = None
 if GEMINI_API_KEY:
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=GEMINI_API_KEY)
-        model_gemini = genai.GenerativeModel("gemini-2.0-flash")
+        import google.genai as genai
+        client_gemini = genai.Client(api_key=GEMINI_API_KEY)
+        model_gemini = "gemini-2.0-flash"
+        logger.info("✅ Gemini berhasil dimuat dengan pustaka baru")
     except Exception as e:
-        logger.warning(f"Gemini tidak dapat dimuat: {str(e)}")
+        logger.warning(f"⚠️ Gemini tidak dapat dimuat: {str(e)}")
 
 client_groq = None
 if GROQ_API_KEY:
     try:
         from groq import Groq
         client_groq = Groq(api_key=GROQ_API_KEY)
+        logger.info("✅ Groq berhasil dimuat")
     except Exception as e:
-        logger.warning(f"Groq tidak dapat dimuat: {str(e)}")
+        logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
 model_mistral = "mistral-tiny"
 
 def buat_gambar(deskripsi: str) -> str:
     if not OPENROUTER_API_KEY:
-        return "❌ Fitur gambar belum dikonfigurasi."
+        return "❌ Fitur pembuatan gambar belum dikonfigurasi."
     try:
         res = requests.post(
             "https://openrouter.ai/api/v1/images/generations",
@@ -75,7 +77,7 @@ def buat_gambar(deskripsi: str) -> str:
             },
             json={
                 "model": "stabilityai/stable-diffusion-xl-base-1.0",
-                "prompt": deskripsi + ", kualitas tinggi, tajam",
+                "prompt": deskripsi + ", kualitas tinggi, tajam, detail jelas",
                 "n": 1,
                 "size": "1024x1024"
             },
@@ -84,10 +86,10 @@ def buat_gambar(deskripsi: str) -> str:
         res.raise_for_status()
         data = res.json()
         url_gambar = data["data"][0]["url"]
-        return f"✅ Berikut gambarnya:\n\n![Gambar]({url_gambar})"
+        return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar]({url_gambar})"
     except Exception as e:
-        logger.warning(f"Gagal buat gambar: {str(e)}")
-        return "❌ Tidak dapat membuat gambar saat ini."
+        logger.warning(f"❌ Gagal buat gambar: {str(e)}")
+        return "❌ Maaf, tidak dapat membuat gambar saat ini."
 
 def cari_informasi(kueri: str) -> str:
     if SERPAPI_KEY:
@@ -105,7 +107,7 @@ def cari_informasi(kueri: str) -> str:
                     hasil += f"{idx}. **{item.get('title','')}**\n{item.get('snippet','')}\nSumber: {item.get('link','')}\n\n"
                 return hasil
         except Exception as e:
-            logger.warning(f"SerpApi gagal: {str(e)}")
+            logger.warning(f"⚠️ SerpApi gagal: {str(e)}")
 
     try:
         res = requests.get(
@@ -120,8 +122,8 @@ def cari_informasi(kueri: str) -> str:
         else:
             return "🔍 Silakan perjelas pertanyaan Anda agar saya bisa cari informasi yang sesuai."
     except Exception as e:
-        logger.warning(f"DuckDuckGo gagal: {str(e)}")
-        return "❌ Tidak dapat mengakses informasi terbaru."
+        logger.warning(f"⚠️ DuckDuckGo gagal: {str(e)}")
+        return "❌ Tidak dapat mengakses informasi terbaru saat ini."
 
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
@@ -153,7 +155,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            logger.warning(f"OpenRouter gagal: {str(e)}")
+            logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
     if client_groq:
         try:
@@ -164,15 +166,15 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             )
             return res.choices[0].message.content.strip()
         except Exception as e:
-            logger.warning(f"Groq gagal: {str(e)}")
+            logger.warning(f"⚠️ Groq gagal: {str(e)}")
 
-    if model_gemini:
+    if GEMINI_API_KEY and model_gemini:
         try:
-            res = model_gemini.generate_content(pesan_lengkap)
+            res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
             if res.text:
                 return res.text.strip()
         except Exception as e:
-            logger.warning(f"Gemini gagal: {str(e)}")
+            logger.warning(f"⚠️ Gemini gagal: {str(e)}")
 
     if MISTRAL_API_KEY:
         try:
@@ -185,9 +187,9 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
             res.raise_for_status()
             return res.json()["choices"][0]["message"]["content"].strip()
         except Exception as e:
-            logger.warning(f"Mistral gagal: {str(e)}")
+            logger.warning(f"⚠️ Mistral gagal: {str(e)}")
 
-    return "❌ Maaf, semua layanan sedang tidak tersedia. Silakan coba lagi nanti atau periksa konfigurasi kunci API."
+    return "❌ Maaf, semua layanan AI belum dikonfigurasi atau sedang tidak tersedia. Pastikan setidaknya salah satu kunci API (OpenRouter/Groq/Gemini/Mistral) sudah dimasukkan dengan benar."
 
 class PesanMasuk(BaseModel):
     pesan: str
