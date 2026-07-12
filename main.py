@@ -201,44 +201,47 @@ def cari_informasi(kueri: str) -> str:
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
-    # Deteksi perintah khusus
+    # Deteksi perintah gambar
     if teks.startswith((
         "buat gambar", "gambarkan", "buatkan gambar", "tampilkan gambar",
         "bikin gambar", "gambar"
     )):
         return buat_gambar(pertanyaan)
     
-    # Daftar kata kunci untuk memicu pencarian otomatis
+    # Daftar kata kunci yang memicu pencarian
     kata_kunci_cari = [
         "cari", "info terbaru", "berita", "jelaskan terbaru", "data terbaru",
-        "siapa presiden", "kepala negara", "perdana menteri", "presiden indonesia",
+        "siapa presiden", "kepala negara", "presiden indonesia", "wakil presiden",
         "berapa harga", "kurs", "nilai tukar", "cuaca", "suhu", "iklim",
         "berita hari ini", "update", "terkini", "saat ini", "sekarang",
-        "hasil", "kemenangan", "perkembangan", "status", "jumlah", "statistik"
+        "hasil", "kemenangan", "perkembangan", "status", "jumlah", "statistik",
+        "kapan", "dimana", "tanggal", "hari ini", "bulan ini", "tahun ini"
     ]
 
     # Cek apakah butuh pencarian
     butuh_cari = any(kata in teks for kata in kata_kunci_cari)
+    hasil_cari = None
     if butuh_cari:
-        return cari_informasi(pertanyaan)
+        hasil_cari = cari_informasi(pertanyaan)
+        if hasil_cari:
+            return hasil_cari
 
+    # Jika pencarian tidak memberi hasil, lanjutkan ke jawaban model
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
-    # 1. OpenRouter
+    # 1. Coba OpenRouter
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://alina.id",
-                    "X-Title": "Alina AI",
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "google/gemini-2.0-flash-lite-preview-02-05:free",
+                    "model": "google/gemini-flash-1.5",
                     "messages": [{"role": "user", "content": pesan_lengkap}],
-                    "max_tokens": 2048
+                    "max_tokens": 1024
                 },
                 timeout=25
             )
@@ -247,17 +250,19 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
-    # 2. Groq
+    # 2. Coba Groq
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
-                model="llama3-8b-32768",
+                model="llama3-8b-8192",
                 messages=[{"role": "user", "content": pesan_lengkap}],
-                timeout=20
+                max_tokens=1024
             )
             return res.choices[0].message.content.strip()
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
+
+    return "❌ Maaf, saya tidak dapat menjawab pertanyaan ini saat ini."
 
     # 3. Gemini
     if client_gemini and model_gemini:
