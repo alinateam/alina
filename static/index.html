@@ -48,16 +48,11 @@
 
     <aside class="w-72 bg-sidebar dark:bg-sidebarDark border-r border-gray-200 dark:border-gray-700 flex flex-col">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-3 mb-4">
+            <div class="flex items-center gap-3 mb-6">
                 <div class="w-10 h-10 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden">
                     <img src="/static/assets/logo.png" alt="Logo Alina" class="w-full h-full object-contain">
                 </div>
                 <h2 class="text-lg font-bold">Alina AI</h2>
-            </div>
-
-            <div class="mb-6 flex flex-col items-center">
-                <img src="/static/assets/karakter.png" alt="Karakter Alina" class="w-32 h-auto rounded-xl shadow-md">
-                <p class="text-xs text-center text-gray-500 dark:text-gray-300 mt-2">Asisten cerdas siap membantu Anda</p>
             </div>
 
             <button id="obrolanBaru" class="w-full bg-alina hover:bg-alinaDark text-white rounded-lg py-2 px-3 flex items-center justify-center gap-2">
@@ -89,8 +84,8 @@
 
         <div id="chatArea" class="flex-1 p-4 overflow-y-auto scrollbar-thin space-y-4 bg-gray-50 dark:bg-gray-900">
             <div class="flex gap-3 max-w-[90%]">
-                <div class="w-8 h-8 rounded-full bg-alina flex items-center justify-center text-white flex-shrink-0 mt-1">
-                    <i class="fa fa-robot"></i>
+                <div class="w-8 h-8 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 mt-1">
+                    <img src="/static/assets/karakter.png" alt="Alina" class="w-full h-full object-contain">
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-3 shadow-sm">
                     <p>Halo! Saya Alina AI. Ada yang bisa saya bantu hari ini?</p>
@@ -132,8 +127,8 @@
     tombolObrolanBaru.addEventListener('click', () => {
         chatArea.innerHTML = `
             <div class="flex gap-3 max-w-[90%]">
-                <div class="w-8 h-8 rounded-full bg-alina flex items-center justify-center text-white flex-shrink-0 mt-1">
-                    <i class="fa fa-robot"></i>
+                <div class="w-8 h-8 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 mt-1">
+                    <img src="/static/assets/karakter.png" alt="Alina" class="w-full h-full object-contain">
                 </div>
                 <div class="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-3 shadow-sm">
                     <p>Halo! Saya Alina AI. Ada yang bisa saya bantu hari ini?</p>
@@ -146,14 +141,25 @@
         const div = document.createElement('div');
         div.className = `flex gap-3 max-w-[90%] ${pengirim === 'pengguna' ? 'ml-auto flex-row-reverse' : ''}`;
         
-        div.innerHTML = `
-            <div class="w-8 h-8 rounded-full ${pengirim === 'pengguna' ? 'bg-gray-700' : 'bg-alina'} flex items-center justify-center text-white flex-shrink-0 mt-1">
-                <i class="fa ${pengirim === 'pengguna' ? 'fa-user' : 'fa-robot'}"></i>
-            </div>
-            <div class="${pengirim === 'pengguna' ? 'bg-alina text-white rounded-tr-none' : 'bg-white dark:bg-gray-800 rounded-tl-none'} rounded-2xl p-3 shadow-sm">
-                <p>${teks.replace(/\n/g, '<br>')}</p>
-            </div>
-        `;
+        if (pengirim === 'alina') {
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 mt-1">
+                    <img src="/static/assets/karakter.png" alt="Alina" class="w-full h-full object-contain">
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-3 shadow-sm">
+                    <p>${teks.replace(/\n/g, '<br>')}</p>
+                </div>
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white flex-shrink-0 mt-1">
+                    <i class="fa fa-user"></i>
+                </div>
+                <div class="bg-alina text-white rounded-2xl rounded-tr-none p-3 shadow-sm">
+                    <p>${teks.replace(/\n/g, '<br>')}</p>
+                </div>
+            `;
+        }
 
         chatArea.appendChild(div);
         chatArea.scrollTop = chatArea.scrollHeight;
