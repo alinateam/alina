@@ -5,11 +5,14 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import os
 import logging
+import requests
+import google.generativeai as genai
+from groq import Groq
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.0.0")
+app = FastAPI(title="Alina AI", version="1.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +27,93 @@ if not os.path.exists("static"):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+INSTRUKSI_SISTEM = """
+Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
+Aturan wajib:
+1. Jawab selalu dalam bahasa Indonesia yang jelas, sopan, lembut, dan mudah dimengerti.
+2. Jika ditanya siapa Anda atau siapa pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
+3. Jangan menyebutkan nama model, layanan, atau penyedia AI tertentu.
+4. Jawab secara lengkap, akurat, dan bermanfaat.
+5. Akhiri jawaban dengan kalimat penutup yang ramah dan mengajak melanjutkan percakapan.
+"""
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model_gemini = genai.GenerativeModel("gemini-2.0-flash")
+
+if GROQ_API_KEY:
+    client_groq = Groq(api_key=GROQ_API_KEY)
+    model_groq = "llama3-8b-8192"
+
+model_mistral = "mistral-tiny"
+
+def dapatkan_jawaban(pertanyaan: str) -> str:
+    pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
+
+    if OPENROUTER_API_KEY:
+        try:
+            res = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "HTTP-Referer": "https://alina.id",
+                    "X-Title": "Alina AI"
+                },
+                json={
+                    "model": "google/gemini-flash-1.5",
+                    "messages": [{"role": "user", "content": pesan_lengkap}],
+                    "max_tokens": 2048
+                },
+                timeout=20
+            )
+            res.raise_for_status()
+            return res.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            logger.warning(f"OpenRouter gagal: {str(e)} → lanjut ke Groq")
+
+    if GROQ_API_KEY:
+        try:
+            res = client_groq.chat.completions.create(
+                model=model_groq,
+                messages=[{"role": "user", "content": pesan_lengkap}],
+                timeout=20
+            )
+            return res.choices[0].message.content.strip()
+        except Exception as e:
+            logger.warning(f"Groq gagal: {str(e)} → lanjut ke Gemini")
+
+    if GEMINI_API_KEY:
+        try:
+            res = model_gemini.generate_content(pesan_lengkap)
+            if res.text:
+                return res.text.strip()
+        except Exception as e:
+            logger.warning(f"Gemini gagal: {str(e)} → lanjut ke Mistral")
+
+    if MISTRAL_API_KEY:
+        try:
+            res = requests.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+                json={
+                    "model": model_mistral,
+                    "messages": [{"role": "user", "content": pesan_lengkap}],
+                    "max_tokens": 2048
+                },
+                timeout=20
+            )
+            res.raise_for_status()
+            return res.json()["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            logger.error(f"Mistral juga gagal: {str(e)}")
+
+    return "❌ Maaf, layanan sedang sibuk atau mengalami gangguan. Silakan coba lagi sebentar ya."
+
 class PesanMasuk(BaseModel):
     pesan: str
 
@@ -33,17 +123,7 @@ def halaman_utama():
 
 @app.post("/api/tanya")
 async def tanya_alina(data: PesanMasuk):
-    pesan = data.pesan.lower()
-
-    if "halo" in pesan or "hai" in pesan:
-        jawaban = "Halo! Senang bisa bertemu denganmu 😊 Ada yang bisa saya bantu?"
-    elif "nama" in pesan:
-        jawaban = "Nama saya Alina AI, asisten pintar yang siap membantu menjawab pertanyaan dan menemani ngobrol."
-    elif "terima kasih" in pesan:
-        jawaban = "Sama-sama! Senang bisa membantu. Kalau butuh bantuan lagi, panggil saja ya!"
-    else:
-        jawaban = f"Saya mengerti pesanmu: {data.pesan}\n\nSaat ini saya masih dalam tahap pengembangan, tapi nanti saya akan bisa menjawab lebih lengkap dan akurat!"
-
+    jawaban = dapatkan_jawaban(data.pesan)
     return {"jawaban": jawaban}
 
 if __name__ == "__main__":
