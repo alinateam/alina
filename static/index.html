@@ -66,6 +66,19 @@
                 margin: 8px 0;
             }
             .dark .prose blockquote { border-color: #475569; color: #94a3b8; }
+            /* Gaya untuk tampilan gambar */
+            .prose img {
+                max-width: 100%;
+                height: auto;
+                border-radius: 8px;
+                margin: 10px 0;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                cursor: pointer;
+                transition: transform 0.2s ease;
+            }
+            .prose img:hover {
+                transform: scale(1.01);
+            }
             /* Modal */
             .modal {
                 background: rgba(0,0,0,0.6);
@@ -402,6 +415,8 @@
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`(.*?)`/g, '<code>$1</code>')
             .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            .replace(/!\[Gambar\]\((.*?)\)/g, '<img src="$1" alt="Gambar hasil buatan Alina" loading="lazy">')
+            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" loading="lazy">')
             .replace(/^- (.*)$/gm, '<li>$1</li>')
             .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
             .replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>')
