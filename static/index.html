@@ -49,11 +49,17 @@
     <aside class="w-72 bg-sidebar dark:bg-sidebarDark border-r border-gray-200 dark:border-gray-700 flex flex-col">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-full bg-alina flex items-center justify-center text-white">
-                    <i class="fa fa-robot text-xl"></i>
+                <div class="w-10 h-10 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden">
+                    <img src="/static/assets/logo.png" alt="Logo Alina" class="w-full h-full object-contain">
                 </div>
                 <h2 class="text-lg font-bold">Alina AI</h2>
             </div>
+
+            <div class="mb-6 flex flex-col items-center">
+                <img src="/static/assets/karakter.png" alt="Karakter Alina" class="w-32 h-auto rounded-xl shadow-md">
+                <p class="text-xs text-center text-gray-500 dark:text-gray-300 mt-2">Asisten cerdas siap membantu Anda</p>
+            </div>
+
             <button id="obrolanBaru" class="w-full bg-alina hover:bg-alinaDark text-white rounded-lg py-2 px-3 flex items-center justify-center gap-2">
                 <i class="fa fa-plus"></i> Obrolan Baru
             </button>
