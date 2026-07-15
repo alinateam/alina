@@ -13,7 +13,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.5.1")
+app = FastAPI(title="Alina AI", version="1.5.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -67,65 +67,19 @@ if GROQ_API_KEY:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
 def buat_gambar(deskripsi: str) -> str:
-    if OPENROUTER_API_KEY and len(OPENROUTER_API_KEY) > 10:
-        try:
-            res = requests.post(
-                "https://openrouter.ai/api/v1/images/generations",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "HTTP-Referer": "https://alina.id",
-                    "X-Title": "Alina AI",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "stabilityai/stable-diffusion-xl-base-1.0",
-                    "prompt": f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, tidak ada cacat",
-                    "n": 1,
-                    "size": "1024x1024",
-                    "response_format": "url"
-                },
-                timeout=45
-            )
-            res.raise_for_status()
-            data = res.json()
+    try:
+        prompt_lengkap = f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas, tidak ada cacat, gaya alami"
+        url_gambar = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true"
+        
+        # Cek koneksi
+        cek = requests.head(url_gambar, timeout=20)
+        cek.raise_for_status()
 
-            if "data" in data and len(data["data"]) > 0 and "url" in data["data"][0]:
-                url_gambar = data["data"][0]["url"]
-                return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Klik gambar untuk melihat ukuran penuh*"
-            else:
-                logger.warning(f"⚠️ Hasil pembuatan gambar tidak valid: {data}")
+        return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Klik gambar untuk melihat ukuran penuh*"
 
-        except requests.exceptions.HTTPError as e:
-            logger.warning(f"⚠️ Kesalahan API OpenRouter: {str(e)}")
-        except Exception as e:
-            logger.warning(f"⚠️ OpenRouter gambar gagal: {str(e)}")
-
-    if HUGGINGFACE_API_KEY and len(HUGGINGFACE_API_KEY) > 10:
-        try:
-            res = requests.post(
-                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-                headers={
-                    "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "inputs": f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas",
-                    "options": {"wait_for_model": True, "use_cache": False}
-                },
-                timeout=60
-            )
-            res.raise_for_status()
-            
-            gambar_biner = res.content
-            gambar_base64 = base64.b64encode(gambar_biner).decode("utf-8")
-            url_gambar = f"data:image/png;base64,{gambar_base64}"
-
-            return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Gambar tersimpan secara permanen*"
-
-        except Exception as e:
-            logger.warning(f"⚠️ Hugging Face gambar gagal: {str(e)}")
-
-    return "❌ Maaf, fitur pembuatan gambar sedang tidak tersedia saat ini. Silakan coba lagi nanti."
+    except Exception as e:
+        logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
+        return "❌ Maaf, fitur pembuatan gambar sedang dalam perbaikan. Silakan coba lagi nanti."
 
 def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
@@ -246,7 +200,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
                 timeout=25
             )
             res.raise_for_status()
-            return res.json()["choices"][0]["message"]["content"].strip()
+            return res.json()["choices"][0]["message"].strip()
         except Exception as e:
             logger.warning(f"⚠️ Mistral gagal: {str(e)}")
 
