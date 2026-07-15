@@ -13,7 +13,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.5.4")
+app = FastAPI(title="Alina AI", version="1.5.5")
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,17 +69,18 @@ if GROQ_API_KEY:
 def buat_gambar(deskripsi: str) -> str:
     try:
         prompt_lengkap = f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas, tidak ada cacat, gaya alami"
-        url_gambar = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true&seed={os.urandom(4).hex()}"
-        
-        cek = requests.head(url_gambar, timeout=20)
-        cek.raise_for_status()
+        url_panjang = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true&seed={os.urandom(4).hex()}"
+
+        res_pendek = requests.get(f"https://tinyurl.com/api-create.php?url={url_panjang}", timeout=15)
+        res_pendek.raise_for_status()
+        url_pendek = res_pendek.text.strip()
 
         return f"""✅ Berikut gambar yang Anda minta:
 
-🔗 **Tautan langsung gambar:**
-{url_gambar}
+🔗 **Tautan Gambar:**
+{url_pendek}
 
-*Klik tautan di atas untuk melihat gambar ukuran penuh dengan jelas*"""
+*Klik tautan di atas untuk melihat gambar ukuran penuh*"""
 
     except Exception as e:
         logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
