@@ -13,7 +13,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.5.2")
+app = FastAPI(title="Alina AI", version="1.5.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,13 +69,16 @@ if GROQ_API_KEY:
 def buat_gambar(deskripsi: str) -> str:
     try:
         prompt_lengkap = f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas, tidak ada cacat, gaya alami"
-        url_gambar = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true"
+        url_gambar = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true&seed={os.urandom(4).hex()}"
         
-        # Cek koneksi
         cek = requests.head(url_gambar, timeout=20)
         cek.raise_for_status()
 
-        return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Klik gambar untuk melihat ukuran penuh*"
+        return f"""✅ Berikut gambar yang Anda minta:
+
+![Gambar]({url_gambar})
+
+*Klik kanan → Buka di tab baru untuk melihat ukuran penuh*"""
 
     except Exception as e:
         logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
@@ -172,6 +175,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
+    # 2. Coba Groq
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
