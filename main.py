@@ -7,12 +7,13 @@ import os
 import logging
 import requests
 import json
+import base64
 from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.4.6")
+app = FastAPI(title="Alina AI", version="1.5.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,9 +32,9 @@ INSTRUKSI_SISTEM = f"""
 Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
 Tanggal saat ini: {datetime.now().strftime('%d %B %Y')}.
 Aturan wajib:
-1. Jawab selalu dalam bahasa Indonesia yang sopan, jelas, dan mudah dimengerti.
-2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina."
-3. Jawab dengan lengkap dan akurat sesuai pengetahuan terbaru.
+1. Jawab selalu dalam bahasa Indonesia atau bahasa apapun yang digunakan oleh pengguna dengan lembut, sopan, jelas, dan mudah dimengerti.
+2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, kecerdasan buatan yang dikembangkan di Indonesia oleh Tim Alina."
+3. Jawab semua pertanyaan dengan lengkap, akurat dan sesuai pengetahuan terbaru.
 4. Jika tidak ada hasil pencarian, jawab berdasarkan data yang kamu miliki.
 5. Tawarkan sesuatu tentang topik yang sedang dibahas oleh pengguna sebagai penutup jawaban yang kamu berikan.
 """
@@ -41,6 +42,7 @@ Aturan wajib:
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
@@ -65,49 +67,65 @@ if GROQ_API_KEY:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
 def buat_gambar(deskripsi: str) -> str:
-    if not OPENROUTER_API_KEY or len(OPENROUTER_API_KEY) < 10:
-        return "❌ Fitur pembuatan gambar belum dikonfigurasi. Silakan masukkan kunci API OpenRouter terlebih dahulu."
+    if OPENROUTER_API_KEY and len(OPENROUTER_API_KEY) > 10:
+        try:
+            res = requests.post(
+                "https://openrouter.ai/api/v1/images/generations",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "HTTP-Referer": "https://alina.id",
+                    "X-Title": "Alina AI",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "stabilityai/stable-diffusion-xl-base-1.0",
+                    "prompt": f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, tidak ada cacat",
+                    "n": 1,
+                    "size": "1024x1024",
+                    "response_format": "url"
+                },
+                timeout=45
+            )
+            res.raise_for_status()
+            data = res.json()
 
-    try:
-        res = requests.post(
-            "https://openrouter.ai/api/v1/images/generations",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "HTTP-Referer": "https://alina.id",
-                "X-Title": "Alina AI",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "stabilityai/stable-diffusion-xl-base-1.0",
-                "prompt": f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, tidak ada cacat",
-                "n": 1,
-                "size": "1024x1024",
-                "response_format": "url"
-            },
-            timeout=45
-        )
-        res.raise_for_status()
-        data = res.json()
+            if "data" in data and len(data["data"]) > 0 and "url" in data["data"][0]:
+                url_gambar = data["data"][0]["url"]
+                return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Klik gambar untuk melihat ukuran penuh*"
+            else:
+                logger.warning(f"⚠️ Hasil pembuatan gambar tidak valid: {data}")
 
-        if "data" in data and len(data["data"]) > 0 and "url" in data["data"][0]:
-            url_gambar = data["data"][0]["url"]
-            return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Klik gambar untuk melihat ukuran penuh*"
-        else:
-            logger.warning(f"⚠️ Hasil pembuatan gambar tidak valid: {data}")
-            return "❌ Berhasil diproses, tapi gambar tidak dapat diambil. Silakan coba deskripsi lain."
+        except requests.exceptions.HTTPError as e:
+            logger.warning(f"⚠️ Kesalahan API OpenRouter: {str(e)}")
+        except Exception as e:
+            logger.warning(f"⚠️ OpenRouter gambar gagal: {str(e)}")
 
-    except requests.exceptions.HTTPError as e:
-        logger.warning(f"⚠️ Kesalahan API OpenRouter: {str(e)}")
-        if res.status_code == 401:
-            return "❌ Kunci API OpenRouter tidak valid atau sudah kadaluarsa."
-        elif res.status_code == 402:
-            return "❌ Kuota penggunaan OpenRouter sudah habis."
-        else:
-            return "❌ Layanan pembuatan gambar sedang bermasalah. Silakan coba lagi nanti."
+    if HUGGINGFACE_API_KEY and len(HUGGINGFACE_API_KEY) > 10:
+        try:
+            res = requests.post(
+                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
+                headers={
+                    "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "inputs": f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas",
+                    "options": {"wait_for_model": True, "use_cache": False}
+                },
+                timeout=60
+            )
+            res.raise_for_status()
+            
+            gambar_biner = res.content
+            gambar_base64 = base64.b64encode(gambar_biner).decode("utf-8")
+            url_gambar = f"data:image/png;base64,{gambar_base64}"
 
-    except Exception as e:
-        logger.warning(f"❌ Gagal membuat gambar: {str(e)}")
-        return "❌ Maaf, saya tidak dapat membuat gambar saat ini. Silakan coba deskripsi yang lebih sederhana."
+            return f"✅ Berikut gambar yang Anda minta:\n\n![Gambar Hasil Buatan Alina]({url_gambar})\n\n*Gambar tersimpan secara permanen*"
+
+        except Exception as e:
+            logger.warning(f"⚠️ Hugging Face gambar gagal: {str(e)}")
+
+    return "❌ Maaf, fitur pembuatan gambar sedang tidak tersedia saat ini. Silakan coba lagi nanti."
 
 def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
@@ -160,11 +178,11 @@ def cari_informasi(kueri: str) -> str | None:
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
-    if teks.startswith(("buat gambar", "gambarkan", "bikin gambar")):
+    if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "buatkan gambar", "gambar", "lukis")):
         return buat_gambar(pertanyaan)
 
     kata_kunci_cari = [
-        "cari", "info terbaru", "berita", "data terbaru",
+        "cari", "info terbaru", "berita", "data terbaru", "informasi",
         "siapa presiden", "presiden indonesia", "wakil presiden",
         "saat ini", "sekarang", "hari ini", "bulan ini", "tahun ini",
         "berapa harga", "kurs", "cuaca", "statistik", "jumlah"
@@ -203,7 +221,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
-                model="llama3-8b-32768",  # ✅ Model baru yang aktif
+                model="llama-3.1-8b-instant", 
                 messages=[{"role": "user", "content": pesan_lengkap}],
                 timeout=20
             )
