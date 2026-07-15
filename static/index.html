@@ -470,10 +470,21 @@
         if (!teks) return;
         if (!penggunaSaatIni) return alert("Silakan masuk atau daftar terlebih dahulu untuk mengirim pesan!");
 
-        // ✅ Tampilkan pesan pengguna dengan benar
         tambahPesanKeLayar(teks, 'pengguna');
         pesanInput.value = '';
-        tambahPesanKeLayar('Sedang mengetik...', 'alina');
+    
+        const statusEl = document.createElement('div');
+        statusEl.className = `flex gap-3 max-w-[90%]`;
+        statusEl.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden flex-shrink-0 mt-1">
+                <img src="/static/assets/karakter.png" alt="Alina" class="w-full h-full object-contain">
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-2xl rounded-tl-none p-3 shadow-sm prose">
+                <p>Sedang mengetik...</p>
+            </div>
+        `;
+        chatArea.appendChild(statusEl);
+        chatArea.scrollTop = chatArea.scrollHeight;
 
         try {
             const res = await fetch(`${API_DASAR}/tanya`, {
@@ -481,7 +492,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pesan: teks })
             });
-            chatArea.removeChild(chatArea.lastChild);
+            if (chatArea.contains(statusEl)) chatArea.removeChild(statusEl);
+        
             if (res.ok) {
                 const data = await res.json();
                 tambahPesanKeLayar(data.jawaban, 'alina');
@@ -489,12 +501,11 @@
                 tambahPesanKeLayar('Maaf, terjadi kesalahan saat memproses permintaan.', 'alina');
             }
         } catch (err) {
-            chatArea.removeChild(chatArea.lastChild);
+            if (chatArea.contains(statusEl)) chatArea.removeChild(statusEl);
             tambahPesanKeLayar('Tidak dapat terhubung ke server. Silakan coba lagi nanti.', 'alina');
             console.error(err);
         }
     });
-
     cekSesiAwal();
 </script>
 </body>
