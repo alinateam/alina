@@ -13,7 +13,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.5.3")
+app = FastAPI(title="Alina AI", version="1.5.4")
 
 app.add_middleware(
     CORSMiddleware,
@@ -76,9 +76,10 @@ def buat_gambar(deskripsi: str) -> str:
 
         return f"""✅ Berikut gambar yang Anda minta:
 
-![Gambar]({url_gambar})
+🔗 **Tautan langsung gambar:**
+{url_gambar}
 
-*Klik kanan → Buka di tab baru untuk melihat ukuran penuh*"""
+*Klik tautan di atas untuk melihat gambar ukuran penuh dengan jelas*"""
 
     except Exception as e:
         logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
@@ -175,7 +176,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
-    # 2. Coba Groq
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
