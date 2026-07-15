@@ -13,7 +13,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.5.6")
+app = FastAPI(title="Alina AI", version="1.5.7")
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,6 +39,7 @@ Aturan wajib:
 5. Tawarkan sesuatu tentang topik yang sedang dibahas oleh pengguna sebagai penutup jawaban yang kamu berikan.
 """
 
+# Kunci API
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -46,6 +47,9 @@ HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
+# ==========================================
+# Inisialisasi Model
+# ==========================================
 model_gemini = None
 client_gemini = None
 if GEMINI_API_KEY:
@@ -66,25 +70,33 @@ if GROQ_API_KEY:
     except Exception as e:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
+# ==========================================
+# FUNGSI: MEMBUAT GAMBAR (Tautan polos, bisa diklik otomatis)
+# ==========================================
 def buat_gambar(deskripsi: str) -> str:
     try:
         prompt_lengkap = f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas, tidak ada cacat, gaya alami"
         url_panjang = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true&seed={os.urandom(4).hex()}"
 
+        # Persingkat tautan agar rapi
         res_pendek = requests.get(f"https://tinyurl.com/api-create.php?url={url_panjang}", timeout=15)
         res_pendek.raise_for_status()
         url_pendek = res_pendek.text.strip()
 
+        # Tampilkan URL langsung agar dikenali sebagai tautan
         return f"""✅ Berikut gambar yang Anda minta:
 
-🔗 **[Klik di sini untuk melihat gambar ukuran penuh]({url_pendek})**
+🔗 {url_pendek}
 
-*Tautan: {url_pendek}*"""
+*Klik tautan di atas untuk melihat gambar ukuran penuh*"""
 
     except Exception as e:
         logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
         return "❌ Maaf, fitur pembuatan gambar sedang dalam perbaikan. Silakan coba lagi nanti."
 
+# ==========================================
+# FUNGSI: CARI INFORMASI TERBARU
+# ==========================================
 def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
 
@@ -133,6 +145,9 @@ def cari_informasi(kueri: str) -> str | None:
     logger.info("⚠️ Tidak ada hasil pencarian, lanjut ke jawaban AI")
     return None
 
+# ==========================================
+# FUNGSI UTAMA
+# ==========================================
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
@@ -154,6 +169,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
 
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
+    # 1. Coba OpenRouter
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
@@ -176,6 +192,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
+    # 2. Coba Groq
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
@@ -187,6 +204,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
 
+    # 3. Coba Gemini
     if client_gemini and model_gemini:
         try:
             res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
@@ -195,6 +213,7 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Gemini gagal: {str(e)}")
 
+    # 4. Coba Mistral
     if MISTRAL_API_KEY:
         try:
             res = requests.post(
