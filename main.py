@@ -13,7 +13,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="1.5.5")
+app = FastAPI(title="Alina AI", version="1.5.6")
 
 app.add_middleware(
     CORSMiddleware,
@@ -77,10 +77,9 @@ def buat_gambar(deskripsi: str) -> str:
 
         return f"""✅ Berikut gambar yang Anda minta:
 
-🔗 **Tautan Gambar:**
-{url_pendek}
+🔗 **[Klik di sini untuk melihat gambar ukuran penuh]({url_pendek})**
 
-*Klik tautan di atas untuk melihat gambar ukuran penuh*"""
+*Tautan: {url_pendek}*"""
 
     except Exception as e:
         logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
