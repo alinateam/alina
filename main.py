@@ -71,24 +71,22 @@ if GROQ_API_KEY:
         logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
 
 # ==========================================
-# FUNGSI: MEMBUAT GAMBAR (Tautan polos, bisa diklik otomatis)
+# FUNGSI: MEMBUAT GAMBAR
 # ==========================================
 def buat_gambar(deskripsi: str) -> str:
     try:
         prompt_lengkap = f"{deskripsi}, kualitas tinggi, tajam, warna cerah, resolusi tinggi, detail jelas, tidak ada cacat, gaya alami"
         url_panjang = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt_lengkap)}?width=1024&height=1024&nologo=true&seed={os.urandom(4).hex()}"
 
-        # Persingkat tautan agar rapi
         res_pendek = requests.get(f"https://tinyurl.com/api-create.php?url={url_panjang}", timeout=15)
         res_pendek.raise_for_status()
         url_pendek = res_pendek.text.strip()
 
-        # Tampilkan URL langsung agar dikenali sebagai tautan
         return f"""✅ Berikut gambar yang Anda minta:
 
 🔗 {url_pendek}
 
-*Klik tautan di atas untuk melihat gambar ukuran penuh*"""
+*Klik tautan untuk melihat gambar*"""
 
     except Exception as e:
         logger.warning(f"⚠️ Pembuatan gambar gagal: {str(e)}")
@@ -169,7 +167,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
 
     pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
 
-    # 1. Coba OpenRouter
     if OPENROUTER_API_KEY:
         try:
             res = requests.post(
@@ -192,7 +189,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
 
-    # 2. Coba Groq
     if client_groq:
         try:
             res = client_groq.chat.completions.create(
@@ -204,7 +200,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Groq gagal: {str(e)}")
 
-    # 3. Coba Gemini
     if client_gemini and model_gemini:
         try:
             res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
@@ -213,7 +208,6 @@ def dapatkan_jawaban(pertanyaan: str) -> str:
         except Exception as e:
             logger.warning(f"⚠️ Gemini gagal: {str(e)}")
 
-    # 4. Coba Mistral
     if MISTRAL_API_KEY:
         try:
             res = requests.post(
