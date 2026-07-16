@@ -517,7 +517,7 @@ def halaman_utama():
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
         <style>
-        /* Transisi yang lebih stabil */
+        /* Perbaikan transisi yang stabil */
         .sidebar {
             transition: all 0.3s ease;
             overflow: hidden;
@@ -526,6 +526,7 @@ def halaman_utama():
         .sidebar.tertutup {
             width: 0;
             min-width: 0;
+            border-right: none;
         }
         </style>
     </head>
@@ -533,15 +534,15 @@ def halaman_utama():
         <!-- Bar Atas -->
         <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <!-- Tombol Buka/Tutup -->
+                <!-- Tombol Buka -->
                 <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100">
                     <i class="fa fa-chevron-right fa-lg"></i>
                 </button>
 
                 <!-- Logo + Judul -->
                 <div class="flex items-center gap-3">
-                    <!-- Jalur logo sesuai lokasi Anda -->
-                    <img src="/static/asset/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain">
+                    <!-- Jalur logo diperbaiki, tambahkan pengecekan -->
+                    <img src="/static/asset/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain" onerror="this.style.display='none'">
                     <div>
                         <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
                         <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
@@ -584,14 +585,20 @@ def halaman_utama():
             </div>
         </div>
 
+        <!-- Semua fungsi JS diletakkan di akhir agar pasti terbaca -->
         <script>
-        // Fungsi buka/tutup yang sudah diperbaiki
+        // Fungsi utama buka/tutup sidebar
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const tombolBuka = document.getElementById('tombolBuka');
             
-            sidebar.classList.toggle('tertutup');
-            tombolBuka.classList.toggle('hidden');
+            if (sidebar.classList.contains('tertutup')) {
+                sidebar.classList.remove('tertutup');
+                tombolBuka.classList.add('hidden');
+            } else {
+                sidebar.classList.add('tertutup');
+                tombolBuka.classList.remove('hidden');
+            }
         }
 
         async function kirimPesan() {
@@ -661,7 +668,8 @@ def halaman_utama():
             muatRiwayat();
         }
 
-        muatRiwayat();
+        // Muat riwayat saat halaman terbuka
+        window.onload = muatRiwayat;
         </script>
     </body>
     </html>
