@@ -517,26 +517,29 @@ def halaman_utama():
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
-        /* Perbaikan agar benar-benar tersembunyi */
+        /* CSS sederhana dan aman tanpa sintaks bermasalah */
         .sidebar {
             transition: all 0.3s ease;
             width: 280px;
             overflow: hidden;
-            flex-shrink: 0; /* Cegah lebar berubah sendiri */
+            flex-shrink: 0;
         }
-        .sidebar.closed {
+        .sidebar.tertutup {
             width: 0 !important;
             min-width: 0 !important;
-            border-right-width: 0;
+            border-right: none !important;
             opacity: 0;
+        }
+        .tinggi-riwayat {
+            height: calc(100vh - 120px);
         }
     </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col">
+<body class="bg-gray-50 h-screen flex flex-col m-0 p-0">
     <!-- Header -->
     <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
-            <button id="btnOpen" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
+            <button id="tombolBuka" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
                 <i class="fa fa-chevron-right fa-lg"></i>
             </button>
             <div class="flex items-center gap-3">
@@ -550,33 +553,33 @@ def halaman_utama():
         <small class="text-gray-500 text-xs">v2.4.1 - Keamanan & Pemantauan Aktif</small>
     </div>
 
-    <!-- Main Content -->
+    <!-- Konten Utama -->
     <div class="flex flex-1 overflow-hidden">
-        <!-- Sidebar -->
+        <!-- Sidebar Riwayat -->
         <div id="sidebar" class="sidebar bg-white border-r shadow-sm">
             <div class="p-3 border-b flex items-center justify-between">
                 <h3 class="text-base font-semibold text-gray-700 whitespace-nowrap">Riwayat Obrolan</h3>
                 <div class="flex gap-2">
-                    <button id="btnReset" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
+                    <button id="tombolReset" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
                         <i class="fa fa-refresh"></i>
                     </button>
-                    <button id="btnClose" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
+                    <button id="tombolTutup" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
                         <i class="fa fa-chevron-left"></i>
                     </button>
                 </div>
             </div>
-            <div id="history" class="p-3 overflow-y-auto h-[calc(100vh-120px)] text-sm space-y-2">
+            <div id="riwayat" class="p-3 overflow-y-auto tinggi-riwayat text-sm space-y-2">
                 <p class="text-gray-400 text-center py-6">Belum ada riwayat</p>
             </div>
         </div>
 
-        <!-- Chat Area -->
-        <div id="chatArea" class="flex-1 flex flex-col h-full">
-            <div id="chatContent" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
+        <!-- Area Obrolan -->
+        <div id="areaObrolan" class="flex-1 flex flex-col h-full">
+            <div id="kontenChat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
             <div class="p-3 bg-white border-t flex gap-2">
-                <input type="text" id="inputMsg" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." 
+                <input type="text" id="inputPesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." 
                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
-                <button id="btnSend" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
+                <button id="tombolKirim" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
                     <i class="fa fa-paper-plane"></i>
                 </button>
             </div>
@@ -584,108 +587,108 @@ def halaman_utama():
     </div>
 
     <script>
-        // Toggle Sidebar
+        // Fungsi buka/tutup riwayat
         function toggleSidebar() {
             var sidebar = document.getElementById('sidebar');
-            var btnOpen = document.getElementById('btnOpen');
-            var btnClose = document.getElementById('btnClose');
+            var tombolBuka = document.getElementById('tombolBuka');
+            var tombolTutup = document.getElementById('tombolTutup');
             
-            // Cek status dan ubah kelas
-            if (sidebar.classList.contains('closed')) {
-                sidebar.classList.remove('closed');
-                btnOpen.classList.add('hidden');
-                btnClose.classList.remove('hidden');
+            if (sidebar.classList.contains('tertutup')) {
+                sidebar.classList.remove('tertutup');
+                tombolBuka.classList.add('hidden');
+                tombolTutup.classList.remove('hidden');
             } else {
-                sidebar.classList.add('closed');
-                btnOpen.classList.remove('hidden');
-                btnClose.classList.add('hidden');
+                sidebar.classList.add('tertutup');
+                tombolBuka.classList.remove('hidden');
+                tombolTutup.classList.add('hidden');
             }
         }
 
-        // Reset Chat
+        // Fungsi reset obrolan
         function resetSemua() {
             fetch('/api/tanya', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({pesan: "reset"})
             });
-            document.getElementById('chatContent').innerHTML = '';
-            loadHistory();
+            document.getElementById('kontenChat').innerHTML = '';
+            muatRiwayat();
         }
 
-        // Send Message
+        // Fungsi kirim pesan
         async function kirimPesan() {
-            var input = document.getElementById('inputMsg');
-            var text = input.value.trim();
-            if (!text) return;
+            var input = document.getElementById('inputPesan');
+            var teks = input.value.trim();
+            if (!teks) return;
             input.value = '';
-            addMessage('Anda', text);
-            addMessage('Alina', 'Sedang memproses...');
+            tambahPesan('Anda', teks);
+            tambahPesan('Alina', 'Sedang memproses...');
 
             try {
                 var res = await fetch('/api/tanya', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({pesan: text})
+                    body: JSON.stringify({pesan: teks})
                 });
                 var data = await res.json();
-                updateLastMessage('Alina', data.jawaban);
-                loadHistory();
+                ubahPesanTerakhir('Alina', data.jawaban);
+                muatRiwayat();
             } catch (err) {
-                updateLastMessage('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
+                ubahPesanTerakhir('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
             }
         }
 
-        // Add Message
-        function addMessage(sender, text) {
-            var box = document.getElementById('chatContent');
+        // Tambah pesan ke tampilan
+        function tambahPesan(pengirim, teks) {
+            var kotak = document.getElementById('kontenChat');
             var div = document.createElement('div');
-            div.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (sender === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
-            div.innerHTML = '<b>' + sender + ':</b><br>' + text.replace(/\n/g, '<br>');
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
+            div.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (pengirim === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
+            div.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
+            kotak.appendChild(div);
+            kotak.scrollTop = kotak.scrollHeight;
         }
 
-        // Update Last Message
-        function updateLastMessage(sender, text) {
-            var box = document.getElementById('chatContent');
-            var last = box.lastChild;
-            last.innerHTML = '<b>' + sender + ':</b><br>' + text.replace(/\n/g, '<br>');
+        // Ubah pesan terakhir
+        function ubahPesanTerakhir(pengirim, teks) {
+            var kotak = document.getElementById('kontenChat');
+            var terakhir = kotak.lastChild;
+            terakhir.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
         }
 
-        // Load History
-        async function loadHistory() {
+        // Muat daftar riwayat
+        async function muatRiwayat() {
             var res = await fetch('/api/riwayat');
             var data = await res.json();
-            var box = document.getElementById('history');
+            var kotak = document.getElementById('riwayat');
             if (data.length === 0) {
-                box.innerHTML = '<p class="text-gray-400 text-center py-6">Belum ada riwayat</p>';
+                kotak.innerHTML = '<p class="text-gray-400 text-center py-6">Belum ada riwayat</p>';
                 return;
             }
-            box.innerHTML = '';
+            kotak.innerHTML = '';
             data.reverse().forEach(function(item) {
                 var div = document.createElement('div');
                 div.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700';
                 div.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
                 div.onclick = function() {
-                    document.getElementById('chatContent').innerHTML = '';
-                    addMessage('Anda', item.tanya);
-                    addMessage('Alina', item.jawaban);
+                    document.getElementById('kontenChat').innerHTML = '';
+                    tambahPesan('Anda', item.tanya);
+                    tambahPesan('Alina', item.jawaban);
                 };
-                box.appendChild(div);
+                kotak.appendChild(div);
             });
         }
 
-        // Bind Events
-        document.getElementById('btnOpen').addEventListener('click', toggleSidebar);
-        document.getElementById('btnClose').addEventListener('click', toggleSidebar);
-        document.getElementById('btnReset').addEventListener('click', resetSemua);
-        document.getElementById('btnSend').addEventListener('click', kirimPesan);
-        document.getElementById('inputMsg').addEventListener('keydown', function(e) {
+        // Hubungkan tombol ke fungsi
+        document.getElementById('tombolBuka').addEventListener('click', toggleSidebar);
+        document.getElementById('tombolTutup').addEventListener('click', toggleSidebar);
+        document.getElementById('tombolReset').addEventListener('click', resetSemua);
+        document.getElementById('tombolKirim').addEventListener('click', kirimPesan);
+        document.getElementById('inputPesan').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') kirimPesan();
         });
 
-        window.onload = loadHistory;
+        // Jalankan saat halaman siap
+        window.onload = muatRiwayat;
     </script>
 </body>
 </html>
