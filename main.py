@@ -21,7 +21,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="2.2.0")
+app = FastAPI(title="Alina AI", version="2.3.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,11 +40,12 @@ INSTRUKSI_SISTEM = f"""
 Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
 Tanggal saat ini: {datetime.now().strftime('%d %B %Y')}.
 Aturan wajib:
-1. Jawab selalu dalam bahasa Indonesia atau bahasa apapun yang digunakan oleh pengguna dengan lembut, sopan, jelas, dan mudah dimengerti.
+1. Jawab selalu dalam bahasa Indonesia atau bahasa yang digunakan pengguna dengan lembut, sopan, jelas, dan mudah dimengerti.
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, kecerdasan buatan yang dikembangkan di Indonesia oleh Tim Alina."
-3. Jawab semua pertanyaan dengan lengkap, akurat dan sesuai pengetahuan terbaru.
-4. Jika tidak ada hasil pencarian, jawab berdasarkan data yang kamu miliki.
-5. Tawarkan sesuatu tentang topik yang sedang dibahas oleh pengguna sebagai penutup jawaban yang kamu berikan.
+3. Jawab lengkap, akurat, dan sesuai konteks percakapan sebelumnya.
+4. Jika tidak tahu jawaban, katakan dengan jujur.
+5. Jika diminta merangkum, berikan ringkasan yang padat, jelas, dan mencakup poin-poin penting.
+6. Tawarkan informasi tambahan yang relevan sebagai penutup jawaban.
 """
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -68,27 +69,42 @@ B2_BUCKET = os.getenv("B2_BUCKET", "alina-utama")
 B2_MAX_MB = 9 * 1024
 B2_SISA_MB = 8 * 1024
 
+MAKS_KONTEKS = 6
 RIWAYAT_OBROLAN: List[Dict] = []
+KONTEKS_PERCAKAPAN: List[Dict] = []
 
-model_gemini = None
-client_gemini = None
-if GEMINI_API_KEY:
-    try:
-        import google.genai as genai
-        client_gemini = genai.Client(api_key=GEMINI_API_KEY)
-        model_gemini = "gemini-2.0-flash-lite"
-        logger.info("✅ Gemini berhasil dimuat")
-    except Exception as e:
-        logger.warning(f"⚠️ Gemini tidak dapat dimuat: {str(e)}")
+URUTAN_MODEL = [
+    {"nama": "Groq", "aktif": False, "client": None, "model": "llama-3.1-8b-instant"},
+    {"nama": "Gemini", "aktif": False, "client": None, "model": "gemini-2.0-flash-lite"},
+    {"nama": "OpenRouter", "aktif": False, "model": "google/gemini-2.0-flash-lite-preview-02-05:free"},
+    {"nama": "Mistral", "aktif": False, "model": "mistral-small-latest"}
+]
 
-client_groq = None
 if GROQ_API_KEY:
     try:
         from groq import Groq
-        client_groq = Groq(api_key=GROQ_API_KEY)
-        logger.info("✅ Groq berhasil dimuat")
+        URUTAN_MODEL[0]["client"] = Groq(api_key=GROQ_API_KEY)
+        URUTAN_MODEL[0]["aktif"] = True
+        logger.info("✅ Groq siap digunakan")
     except Exception as e:
-        logger.warning(f"⚠️ Groq tidak dapat dimuat: {str(e)}")
+        logger.warning(f"⚠️ Groq gagal dimuat: {e}")
+
+if GEMINI_API_KEY:
+    try:
+        import google.genai as genai
+        URUTAN_MODEL[1]["client"] = genai.Client(api_key=GEMINI_API_KEY)
+        URUTAN_MODEL[1]["aktif"] = True
+        logger.info("✅ Gemini siap digunakan")
+    except Exception as e:
+        logger.warning(f"⚠️ Gemini gagal dimuat: {e}")
+
+if OPENROUTER_API_KEY:
+    URUTAN_MODEL[2]["aktif"] = True
+    logger.info("✅ OpenRouter siap digunakan")
+
+if MISTRAL_API_KEY:
+    URUTAN_MODEL[3]["aktif"] = True
+    logger.info("✅ Mistral siap digunakan")
 
 supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_SERVICE_KEY:
@@ -122,7 +138,9 @@ def buat_nama_file(deskripsi: str) -> str:
     return f"{waktu}_{id_unik}.jpg"
 
 def catat_riwayat(pertanyaan: str, jawaban: str):
-    """Simpan riwayat obrolan"""
+    """Simpan riwayat lengkap dan konteks percakapan"""
+    global RIWAYAT_OBROLAN, KONTEKS_PERCAKAPAN
+    
     RIWAYAT_OBROLAN.append({
         "waktu": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "tanya": pertanyaan,
@@ -130,6 +148,18 @@ def catat_riwayat(pertanyaan: str, jawaban: str):
     })
     if len(RIWAYAT_OBROLAN) > 50:
         RIWAYAT_OBROLAN.pop(0)
+    
+    KONTEKS_PERCAKAPAN.append({"role": "user", "content": pertanyaan})
+    KONTEKS_PERCAKAPAN.append({"role": "assistant", "content": jawaban})
+    
+    if len(KONTEKS_PERCAKAPAN) > MAKS_KONTEKS * 2:
+        KONTEKS_PERCAKAPAN = KONTEKS_PERCAKAPAN[-(MAKS_KONTEKS * 2):]
+
+def reset_konteks():
+    """Reset konteks percakapan jika diminta"""
+    global KONTEKS_PERCAKAPAN
+    KONTEKS_PERCAKAPAN = []
+    return "✅ Konteks percakapan telah dihapus. Kita bisa mulai topik baru."
 
 def dapatkan_info_supabase() -> tuple[float, List[Dict]]:
     if not supabase:
@@ -138,21 +168,15 @@ def dapatkan_info_supabase() -> tuple[float, List[Dict]]:
         daftar = supabase.storage.from_(SUPABASE_BUCKET).list()
         daftar_valid = [
             f for f in daftar
-            if isinstance(f, dict)
-            and "name" in f
-            and "metadata" in f
-            and isinstance(f["metadata"], dict)
-            and "size" in f["metadata"]
+            if isinstance(f, dict) and "name" in f and "metadata" in f
+            and isinstance(f["metadata"], dict) and "size" in f["metadata"]
         ]
-
         total_byte = sum(f["metadata"]["size"] for f in daftar_valid)
         daftar_urut = sorted(daftar_valid, key=lambda x: x.get("created_at", ""))
-
-        logger.info(f"📊 Supabase: {ukuran_ke_mb(total_byte)} MB terpakai | File: {len(daftar_valid)}")
+        logger.info(f"📊 Supabase: {ukuran_ke_mb(total_byte)} MB | File: {len(daftar_valid)}")
         return ukuran_ke_mb(total_byte), daftar_urut
-
     except Exception as e:
-        logger.warning(f"⚠️ Tidak bisa membaca daftar Supabase: {str(e)}")
+        logger.warning(f"⚠️ Tidak bisa membaca Supabase: {str(e)}")
         return 0.0, []
 
 def pindah_ke_backblaze(file: Dict) -> bool:
@@ -160,7 +184,7 @@ def pindah_ke_backblaze(file: Dict) -> bool:
         return False
     try:
         nama = file["name"]
-        ukuran = ukuran_ke_mb(file["metadata"].get("size", 0))
+        ukuran = ukuran_ke_mb(file["metadata"]["size"])
         data = supabase.storage.from_(SUPABASE_BUCKET).download(nama)
         b2.put_object(Bucket=B2_BUCKET, Key=f"arsip/{nama}", Body=data, ContentType="image/jpeg")
         supabase.storage.from_(SUPABASE_BUCKET).remove([nama])
@@ -174,15 +198,15 @@ def cek_dan_pindah_supabase() -> None:
     total, daftar = dapatkan_info_supabase()
     if total < SUPABASE_MAX_MB or not daftar:
         return
-    logger.warning(f"⚠️ Supabase hampir penuh, mulai pindah {SUPABASE_PINDAH_MB} MB file terlama")
+    logger.warning(f"⚠️ Supabase penuh, pindahkan {SUPABASE_PINDAH_MB} MB terlama")
     terpindah = 0.0
     for f in daftar:
         if terpindah >= SUPABASE_PINDAH_MB:
             break
-        ukuran = ukuran_ke_mb(f["metadata"].get("size", 0))
+        ukuran = ukuran_ke_mb(f["metadata"]["size"])
         if pindah_ke_backblaze(f):
             terpindah += ukuran
-    logger.info(f"✅ Selesai pindah total {terpindah:.2f} MB")
+    logger.info(f"✅ Selesai pindah {terpindah:.2f} MB")
 
 def dapatkan_info_b2() -> tuple[float, List[Dict]]:
     if not b2:
@@ -202,13 +226,13 @@ def cek_dan_bersihkan_b2() -> None:
     total, daftar = dapatkan_info_b2()
     if total < B2_MAX_MB or not daftar:
         return
-    logger.warning(f"⚠️ Backblaze hampir penuh, hapus file terlama hingga tersisa {B2_SISA_MB} MB")
+    logger.warning(f"⚠️ Backblaze penuh, hapus file hingga tersisa {B2_SISA_MB} MB")
     for f in daftar:
         if total <= B2_SISA_MB:
             break
         b2.delete_object(Bucket=B2_BUCKET, Key=f["Key"])
         total -= ukuran_ke_mb(f["Size"])
-        logger.info(f"🗑️ Hapus file lama: {f['Key']}")
+        logger.info(f"🗑️ Hapus: {f['Key']}")
     logger.info(f"✅ Selesai bersihkan, tersisa {total:.2f} MB")
 
 def buat_gambar(deskripsi: str) -> str:
@@ -221,13 +245,11 @@ def buat_gambar(deskripsi: str) -> str:
 
         ukuran_file = ukuran_ke_mb(len(res_gambar.content))
         if ukuran_file > MAKS_UKURAN_FILE_MB:
-            logger.warning(f"⚠️ Ukuran file terlalu besar: {ukuran_file} MB > {MAKS_UKURAN_FILE_MB} MB")
-            return f"❌ Ukuran file terlalu besar ({ukuran_file:.1f} MB). Maksimal yang diizinkan {MAKS_UKURAN_FILE_MB} MB."
+            return f"❌ Ukuran terlalu besar ({ukuran_file:.1f} MB). Maksimal {MAKS_UKURAN_FILE_MB} MB."
 
         nama_file = buat_nama_file(deskripsi)
-        logger.info(f"📥 Menerima gambar: {nama_file} | Ukuran: {ukuran_file} MB")
-
         url_tautan = ""
+
         if supabase:
             try:
                 supabase.storage.from_(SUPABASE_BUCKET).upload(
@@ -235,11 +257,9 @@ def buat_gambar(deskripsi: str) -> str:
                     file=res_gambar.content,
                     file_options={"content-type": "image/jpeg"}
                 )
-                logger.info(f"✅ Berhasil disimpan ke Supabase: {nama_file}")
                 cek_dan_pindah_supabase()
                 url_tautan = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(nama_file)
-            except Exception as e:
-                logger.warning(f"⚠️ Simpan ke Supabase gagal, coba Backblaze: {e}")
+            except Exception:
                 if b2:
                     b2.put_object(Bucket=B2_BUCKET, Key=f"langsung/{nama_file}", Body=res_gambar.content, ContentType="image/jpeg")
                     cek_dan_bersihkan_b2()
@@ -248,8 +268,6 @@ def buat_gambar(deskripsi: str) -> str:
                         Params={"Bucket": B2_BUCKET, "Key": f"langsung/{nama_file}"},
                         ExpiresIn=TAUTAN_BERLAKU_DETIK
                     )
-                else:
-                    raise Exception("Tidak ada penyimpanan yang tersedia")
         else:
             res_pendek = requests.get(f"https://tinyurl.com/api-create.php?url={url_panjang}", timeout=15)
             res_pendek.raise_for_status()
@@ -264,11 +282,13 @@ def buat_gambar(deskripsi: str) -> str:
         return hasil
 
     except Exception as e:
-        logger.error(f"❌ Pembuatan gambar gagal: {str(e)}")
-        return "❌ Maaf, fitur pembuatan gambar sedang dalam perbaikan. Silakan coba lagi nanti."
+        logger.error(f"❌ Gambar gagal: {e}")
+        return "❌ Maaf, fitur pembuatan gambar sedang bermasalah."
 
 def cari_informasi(kueri: str) -> str | None:
+    """Perbaiki: Gabungkan hasil dari berbagai sumber"""
     kueri_lengkap = f"{kueri} Indonesia terbaru"
+    hasil_gabung = []
 
     if SERPAPI_KEY and len(SERPAPI_KEY) > 10:
         try:
@@ -280,83 +300,123 @@ def cari_informasi(kueri: str) -> str | None:
             res.raise_for_status()
             data = res.json()
             if "answer_box" in data and data["answer_box"].get("snippet"):
-                hasil = f"🔍 **Informasi Terbaru:**\n\n{data['answer_box']['snippet']}\n\n🔗 Sumber: {data['answer_box'].get('link', 'Tidak tersedia')}"
-                catat_riwayat(kueri, hasil)
-                return hasil
-            if "organic_results" in data and len(data["organic_results"]) > 0:
-                hasil = "🔍 **Informasi Terbaru:**\n\n"
-                for idx, item in enumerate(data["organic_results"][:2], 1):
-                    hasil += f"{idx}. **{item.get('title','')}**\n{item.get('snippet','')}\n🔗 {item.get('link','')}\n\n"
-                catat_riwayat(kueri, hasil)
-                return hasil
+                hasil_gabung.append(f"📌 {data['answer_box']['snippet']}")
+            if "organic_results" in data:
+                for item in data["organic_results"][:2]:
+                    if item.get("snippet"):
+                        hasil_gabung.append(f"• {item['snippet']}")
         except Exception as e:
-            logger.warning(f"⚠️ SerpApi gagal: {str(e)}")
+            logger.debug(f"SerpApi error: {e}")
 
     try:
-        res = requests.get("https://api.duckduckgo.com/", params={"q": kueri_lengkap, "format": "json", "no_html": 1, "no_redirect": 1, "kl": "id-id"}, timeout=15)
+        res = requests.get(
+            "https://api.duckduckgo.com/",
+            params={"q": kueri_lengkap, "format": "json", "no_html": 1, "no_redirect": 1, "kl": "id-id"},
+            timeout=15
+        )
         res.raise_for_status()
         data = res.json()
         if data.get("AbstractText"):
-            hasil = f"🔍 **Informasi:**\n\n{data['AbstractText']}\n\n🔗 Sumber: {data.get('AbstractURL', 'Tidak tersedia')}"
-            catat_riwayat(kueri, hasil)
-            return hasil
+            hasil_gabung.append(f"ℹ️ {data['AbstractText']}")
     except Exception as e:
-        logger.warning(f"⚠️ DuckDuckGo gagal: {str(e)}")
+        logger.debug(f"DuckDuckGo error: {e}")
 
-    return None
+    if not hasil_gabung:
+        return None
+
+    teks_panjang = "\n\n".join(hasil_gabung)
+    if len(teks_panjang) > 600:
+        return f"🔍 **Informasi Terbaru:**\n\n{buat_rangkuman(teks_panjang)}\n\n*Sumber: Hasil pencarian terpercaya*"
+    else:
+        return f"🔍 **Informasi Terbaru:**\n\n{teks_panjang}"
+
+def buat_rangkuman(teks: str) -> str:
+    """Fitur baru: Buat ringkasan dari teks panjang"""
+    prompt = f"""
+    Buatlah ringkasan yang padat, jelas, dan mencakup semua poin penting dari teks berikut ini.
+    Gunakan bahasa Indonesia yang mudah dimengerti.
+
+    Teks:
+    {teks}
+
+    Ringkasan:
+    """
+    return tanya_model(prompt, hanya_rangkuman=True)
+
+def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
+    """Gunakan model secara berurutan dari yang tercepat"""
+    pesan_sistem = INSTRUKSI_SISTEM
+    if hanya_rangkuman:
+        pesan_sistem += "\nLangsung berikan ringkasannya saja, tidak perlu penjelasan tambahan."
+
+    for model in URUTAN_MODEL:
+        if not model["aktif"]:
+            continue
+        try:
+            logger.info(f"🔍 Menggunakan model: {model['nama']}")
+            
+            if model["nama"] == "Groq":
+                res = model["client"].chat.completions.create(
+                    model=model["model"],
+                    messages=[{"role": "system", "content": pesan_sistem}] + KONTEKS_PERCAKAPAN + [{"role": "user", "content": pertanyaan}],
+                    max_tokens=1024,
+                    temperature=0.7
+                )
+                return res.choices[0].message.content.strip()
+
+            elif model["nama"] == "Gemini":
+                pesan_tergabung = f"{pesan_sistem}\n\nRiwayat obrolan:\n{KONTEKS_PERCAKAPAN}\n\nPertanyaan: {pertanyaan}"
+                res = model["client"].models.generate_content(model=model["model"], contents=pesan_tergabung)
+                return res.text.strip()
+
+            elif model["nama"] == "OpenRouter":
+                res = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "HTTP-Referer": "https://alina.id", "Content-Type": "application/json"},
+                    json={"model": model["model"], "messages": [{"role": "system", "content": pesan_sistem}] + KONTEKS_PERCAKAPAN + [{"role": "user", "content": pertanyaan}], "max_tokens": 1024},
+                    timeout=25
+                )
+                res.raise_for_status()
+                return res.json()["choices"][0]["message"]["content"].strip()
+
+            elif model["nama"] == "Mistral":
+                res = requests.post(
+                    "https://api.mistral.ai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+                    json={"model": model["model"], "messages": [{"role": "system", "content": pesan_sistem}] + KONTEKS_PERCAKAPAN + [{"role": "user", "content": pertanyaan}], "max_tokens": 1024},
+                    timeout=25
+                )
+                res.raise_for_status()
+                return res.json()["choices"][0]["message"]["content"].strip()
+
+        except Exception as e:
+            logger.warning(f"⚠️ Model {model['nama']} gagal: {e}")
+            continue
+
+    return "❌ Maaf, semua model sedang sibuk atau tidak tersedia. Silakan coba lagi nanti."
 
 def dapatkan_jawaban(pertanyaan: str) -> str:
     teks = pertanyaan.strip().lower()
 
-    if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "buatkan gambar", "gambar", "lukis")):
+    if teks in ["reset", "hapus konteks", "mulai baru"]:
+        return reset_konteks()
+
+    if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "gambar", "lukis")):
         return buat_gambar(pertanyaan)
 
-    kata_kunci_cari = ["cari", "info terbaru", "berita", "data terbaru", "informasi", "siapa presiden", "presiden indonesia", "saat ini", "sekarang", "hari ini", "berapa harga", "kurs", "cuaca"]
-    butuh_cari = any(kata in teks for kata in kata_kunci_cari)
-    if butuh_cari:
+    if teks.startswith(("rangkum", "ringkas", "buat ringkasan", "rangkumkan")):
+        hasil = buat_rangkuman(pertanyaan.split(" ", 1)[1])
+        catat_riwayat(pertanyaan, hasil)
+        return hasil
+
+    kata_cari = ["cari", "info terbaru", "berita", "data terbaru", "saat ini", "sekarang", "hari ini", "berapa harga", "kurs", "cuaca"]
+    if any(kata in teks for kata in kata_cari):
         hasil_cari = cari_informasi(pertanyaan)
         if hasil_cari:
+            catat_riwayat(pertanyaan, hasil_cari)
             return hasil_cari
 
-    pesan_lengkap = f"{INSTRUKSI_SISTEM}\n\nPertanyaan: {pertanyaan}"
-    jawaban = "❌ Maaf, saat ini tidak dapat memproses permintaan."
-
-    if OPENROUTER_API_KEY:
-        try:
-            res = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "HTTP-Referer": "https://alina.id", "X-Title": "Alina AI", "Content-Type": "application/json"},
-                json={"model": "google/gemini-2.0-flash-lite-preview-02-05:free", "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 1024},
-                timeout=25
-            )
-            res.raise_for_status()
-            jawaban = res.json()["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            logger.warning(f"⚠️ OpenRouter gagal: {str(e)}")
-
-    if jawaban.startswith("❌") and client_groq:
-        try:
-            res = client_groq.chat.completions.create(model="llama-3.1-8b-instant", messages=[{"role": "user", "content": pesan_lengkap}], timeout=20)
-            jawaban = res.choices[0].message.content.strip()
-        except Exception as e:
-            logger.warning(f"⚠️ Groq gagal: {str(e)}")
-
-    if jawaban.startswith("❌") and client_gemini:
-        try:
-            res = client_gemini.models.generate_content(model=model_gemini, contents=pesan_lengkap)
-            if res.text:
-                jawaban = res.text.strip()
-        except Exception as e:
-            logger.warning(f"⚠️ Gemini gagal: {str(e)}")
-
-    if jawaban.startswith("❌") and MISTRAL_API_KEY:
-        try:
-            res = requests.post("https://api.mistral.ai/v1/chat/completions", headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"}, json={"model": "mistral-small-latest", "messages": [{"role": "user", "content": pesan_lengkap}], "max_tokens": 1024}, timeout=25)
-            res.raise_for_status()
-            jawaban = res.json()["choices"][0]["message"].strip()
-        except Exception as e:
-            logger.warning(f"⚠️ Mistral gagal: {str(e)}")
-
+    jawaban = tanya_model(pertanyaan)
     catat_riwayat(pertanyaan, jawaban)
     return jawaban
 
@@ -377,9 +437,14 @@ def halaman_utama():
         <div id="sidebar" class="w-80 bg-white shadow-lg transition-all duration-300 ease-in-out">
             <div class="p-4 border-b flex justify-between items-center">
                 <h3 class="text-lg font-semibold text-gray-800">Riwayat Obrolan</h3>
-                <button onclick="toggleSidebar()" class="text-gray-600 hover:text-gray-900">
-                    <i class="fa fa-chevron-left fa-lg"></i>
-                </button>
+                <div>
+                    <button onclick="resetSemua()" class="text-blue-600 mr-2" title="Mulai baru">
+                        <i class="fa fa-refresh"></i>
+                    </button>
+                    <button onclick="toggleSidebar()" class="text-gray-600 hover:text-gray-900">
+                        <i class="fa fa-chevron-left fa-lg"></i>
+                    </button>
+                </div>
             </div>
             <div id="riwayat" class="p-3 overflow-y-auto h-[calc(100vh-70px)] text-sm space-y-3">
                 <p class="text-gray-500 text-center">Belum ada riwayat</p>
@@ -396,7 +461,7 @@ def halaman_utama():
             </div>
             <div id="konten-chat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
             <div class="p-4 bg-white border-t flex gap-2">
-                <input type="text" id="pesan" placeholder="Ketik pertanyaan Anda..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <input type="text" id="pesan" placeholder="Ketik pesan, perintah: 'rangkum teks...', 'reset', 'buat gambar...'" class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
                 <button onclick="kirimPesan()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg">
                     <i class="fa fa-paper-plane"></i>
                 </button>
@@ -436,14 +501,14 @@ def halaman_utama():
                 gantiPesanTerakhir('Alina', data.jawaban);
                 muatRiwayat();
             } catch(e) {
-                gantiPesanTerakhir('Alina', '❌ Terjadi kesalahan, silakan coba lagi.');
+                gantiPesanTerakhir('Alina', '❌ Terjadi kesalahan.');
             }
         }
 
         function tampilkanPesan(pengirim, teks) {
             const kotak = document.getElementById('konten-chat');
             const balon = document.createElement('div');
-            balon.className = `p-3 rounded-lg max-w-[85%] ${pengirim==='Anda' ? 'bg-blue-100 ml-auto' : 'bg-white border'}`;
+            balon.className = `p-3 rounded-lg max-w-[85%] whitespace-pre-wrap ${pengirim==='Anda' ? 'bg-blue-100 ml-auto' : 'bg-white border'}`;
             balon.innerHTML = `<b>${pengirim}:</b><br>${teks.replace(/\n/g, '<br>')}`;
             kotak.appendChild(balon);
             kotak.scrollTop = kotak.scrollHeight;
@@ -464,10 +529,10 @@ def halaman_utama():
                 return;
             }
             kotak.innerHTML = '';
-            data.forEach(item => {
+            data.reverse().forEach(item => {
                 const el = document.createElement('div');
                 el.className = 'p-2 border rounded hover:bg-gray-50 cursor-pointer';
-                el.innerHTML = `<small class="text-gray-500">${item.waktu}</small><br><b>Tanya:</b> ${item.tanya.slice(0,40)}...`;
+                el.innerHTML = `<small class="text-gray-500">${item.waktu}</small><br><b>Tanya:</b> ${item.tanya.slice(0,45)}...`;
                 el.onclick = () => tampilkanLengkap(item);
                 kotak.appendChild(el);
             });
@@ -477,6 +542,12 @@ def halaman_utama():
             document.getElementById('konten-chat').innerHTML = '';
             tampilkanPesan('Anda', item.tanya);
             tampilkanPesan('Alina', item.jawab);
+        }
+
+        async function resetSemua() {
+            await fetch('/api/tanya', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({pesan: "reset"})});
+            document.getElementById('konten-chat').innerHTML = '';
+            muatRiwayat();
         }
 
         muatRiwayat();
