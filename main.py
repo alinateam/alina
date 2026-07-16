@@ -517,14 +517,18 @@ def halaman_utama():
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
+        /* Perbaikan agar benar-benar tersembunyi */
         .sidebar {
-            transition: width 0.3s ease;
+            transition: all 0.3s ease;
             width: 280px;
             overflow: hidden;
+            flex-shrink: 0; /* Cegah lebar berubah sendiri */
         }
         .sidebar.closed {
-            width: 0;
-            border-right: none;
+            width: 0 !important;
+            min-width: 0 !important;
+            border-right-width: 0;
+            opacity: 0;
         }
     </style>
 </head>
@@ -585,9 +589,17 @@ def halaman_utama():
             var sidebar = document.getElementById('sidebar');
             var btnOpen = document.getElementById('btnOpen');
             var btnClose = document.getElementById('btnClose');
-            sidebar.classList.toggle('closed');
-            btnOpen.classList.toggle('hidden');
-            btnClose.classList.toggle('hidden');
+            
+            // Cek status dan ubah kelas
+            if (sidebar.classList.contains('closed')) {
+                sidebar.classList.remove('closed');
+                btnOpen.classList.add('hidden');
+                btnClose.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('closed');
+                btnOpen.classList.remove('hidden');
+                btnClose.classList.add('hidden');
+            }
         }
 
         // Reset Chat
