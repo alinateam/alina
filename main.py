@@ -517,25 +517,69 @@ def halaman_utama():
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
-        /* CSS sederhana dan aman tanpa sintaks bermasalah */
+        /* Semua gaya ditulis di sini agar aman dan tidak memicu error */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #f9fafb;
+        }
         .sidebar {
-            transition: all 0.3s ease;
             width: 280px;
-            overflow: hidden;
             flex-shrink: 0;
+            border-right: 1px solid #e5e7eb;
+            background-color: white;
+            overflow: hidden;
+            transition: all 0.3s ease;
         }
         .sidebar.tertutup {
-            width: 0 !important;
-            min-width: 0 !important;
-            border-right: none !important;
+            width: 0;
+            min-width: 0;
+            border-right: none;
             opacity: 0;
         }
-        .tinggi-riwayat {
+        .sidebar-isi {
             height: calc(100vh - 120px);
+            overflow-y: auto;
+            padding: 12px;
+        }
+        .area-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .konten-pesan {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            background-color: #f9fafb;
+        }
+        .balon-pesan {
+            max-width: 88%;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+        }
+        .pesan-saya {
+            background-color: #dbeafe;
+            margin-left: auto;
+            color: #1e40af;
+        }
+        .pesan-alina {
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            color: #1f2937;
         }
     </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col m-0 p-0">
+<body>
     <!-- Header -->
     <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -556,7 +600,7 @@ def halaman_utama():
     <!-- Konten Utama -->
     <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar Riwayat -->
-        <div id="sidebar" class="sidebar bg-white border-r shadow-sm">
+        <div id="sidebar" class="sidebar">
             <div class="p-3 border-b flex items-center justify-between">
                 <h3 class="text-base font-semibold text-gray-700 whitespace-nowrap">Riwayat Obrolan</h3>
                 <div class="flex gap-2">
@@ -568,14 +612,14 @@ def halaman_utama():
                     </button>
                 </div>
             </div>
-            <div id="riwayat" class="p-3 overflow-y-auto tinggi-riwayat text-sm space-y-2">
+            <div id="riwayat" class="sidebar-isi text-sm space-y-2">
                 <p class="text-gray-400 text-center py-6">Belum ada riwayat</p>
             </div>
         </div>
 
         <!-- Area Obrolan -->
-        <div id="areaObrolan" class="flex-1 flex flex-col h-full">
-            <div id="kontenChat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
+        <div class="area-chat">
+            <div id="kontenChat" class="konten-pesan"></div>
             <div class="p-3 bg-white border-t flex gap-2">
                 <input type="text" id="inputPesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." 
                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
@@ -587,7 +631,7 @@ def halaman_utama():
     </div>
 
     <script>
-        // Fungsi buka/tutup riwayat
+        // Fungsi buka/tutup sidebar
         function toggleSidebar() {
             var sidebar = document.getElementById('sidebar');
             var tombolBuka = document.getElementById('tombolBuka');
@@ -604,7 +648,7 @@ def halaman_utama():
             }
         }
 
-        // Fungsi reset obrolan
+        // Reset percakapan
         function resetSemua() {
             fetch('/api/tanya', {
                 method: 'POST',
@@ -615,7 +659,7 @@ def halaman_utama():
             muatRiwayat();
         }
 
-        // Fungsi kirim pesan
+        // Kirim pesan
         async function kirimPesan() {
             var input = document.getElementById('inputPesan');
             var teks = input.value.trim();
@@ -642,7 +686,7 @@ def halaman_utama():
         function tambahPesan(pengirim, teks) {
             var kotak = document.getElementById('kontenChat');
             var div = document.createElement('div');
-            div.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (pengirim === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
+            div.className = 'balon-pesan ' + (pengirim === 'Anda' ? 'pesan-saya' : 'pesan-alina');
             div.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
             kotak.appendChild(div);
             kotak.scrollTop = kotak.scrollHeight;
@@ -655,7 +699,7 @@ def halaman_utama():
             terakhir.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
         }
 
-        // Muat daftar riwayat
+        // Muat riwayat
         async function muatRiwayat() {
             var res = await fetch('/api/riwayat');
             var data = await res.json();
@@ -667,7 +711,7 @@ def halaman_utama():
             kotak.innerHTML = '';
             data.reverse().forEach(function(item) {
                 var div = document.createElement('div');
-                div.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700';
+                div.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700 mb-2';
                 div.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
                 div.onclick = function() {
                     document.getElementById('kontenChat').innerHTML = '';
@@ -678,7 +722,7 @@ def halaman_utama():
             });
         }
 
-        // Hubungkan tombol ke fungsi
+        // Hubungkan tombol
         document.getElementById('tombolBuka').addEventListener('click', toggleSidebar);
         document.getElementById('tombolTutup').addEventListener('click', toggleSidebar);
         document.getElementById('tombolReset').addEventListener('click', resetSemua);
@@ -687,12 +731,12 @@ def halaman_utama():
             if (e.key === 'Enter') kirimPesan();
         });
 
-        // Jalankan saat halaman siap
         window.onload = muatRiwayat;
     </script>
 </body>
 </html>
     """
+    
 @app.get("/api/riwayat")
 def dapatkan_riwayat():
     return RIWAYAT_OBROLAN
