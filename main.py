@@ -517,7 +517,7 @@ def halaman_utama():
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
         <style>
-        /* Perbaikan transisi yang stabil */
+        /* Transisi sidebar yang stabil */
         .sidebar {
             transition: all 0.3s ease;
             overflow: hidden;
@@ -534,15 +534,15 @@ def halaman_utama():
         <!-- Bar Atas -->
         <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <!-- Tombol Buka -->
+                <!-- Tombol Buka Sidebar -->
                 <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100">
                     <i class="fa fa-chevron-right fa-lg"></i>
                 </button>
 
                 <!-- Logo + Judul -->
                 <div class="flex items-center gap-3">
-                    <!-- Jalur logo diperbaiki, tambahkan pengecekan -->
-                    <img src="/static/asset/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain" onerror="this.style.display='none'">
+                    <!-- ✅ Jalur sudah disesuaikan: assets (ada huruf s) -->
+                    <img src="/static/assets/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain" onerror="this.style.display='none'">
                     <div>
                         <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
                         <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
@@ -585,9 +585,9 @@ def halaman_utama():
             </div>
         </div>
 
-        <!-- Semua fungsi JS diletakkan di akhir agar pasti terbaca -->
+        <!-- Semua fungsi JavaScript diletakkan di akhir agar pasti terbaca -->
         <script>
-        // Fungsi utama buka/tutup sidebar
+        // ✅ Fungsi buka/tutup sidebar yang sudah diperbaiki
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const tombolBuka = document.getElementById('tombolBuka');
@@ -668,7 +668,7 @@ def halaman_utama():
             muatRiwayat();
         }
 
-        // Muat riwayat saat halaman terbuka
+        // Muat riwayat saat halaman selesai dimuat
         window.onload = muatRiwayat;
         </script>
     </body>
