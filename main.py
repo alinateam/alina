@@ -1,14 +1,16 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 import os
 import logging
 import requests
 import time
 import uuid
+import psutil
 from datetime import datetime, timedelta
+from collections import defaultdict
 from supabase import create_client, Client
 import boto3
 from botocore.config import Config
@@ -21,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="2.3.0")
+app = FastAPI(title="Alina AI", version="2.4.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,7 +62,7 @@ SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "alina-sementara")
 SUPABASE_MAX_MB = 40
 SUPABASE_PINDAH_MB = 15
 MAKS_UKURAN_FILE_MB = 4
-TAUTAN_BERLAKU_DETIK = 60 * 60 * 24 * 7
+TAUTAN_BERLAKU_DETIK = 60 * 60 * 24 * 7 
 
 B2_KEY_ID = os.getenv("B2_KEY_ID", "")
 B2_APPLICATION_KEY = os.getenv("B2_APPLICATION_KEY", "")
@@ -69,9 +71,16 @@ B2_BUCKET = os.getenv("B2_BUCKET", "alina-utama")
 B2_MAX_MB = 9 * 1024
 B2_SISA_MB = 8 * 1024
 
-MAKS_KONTEKS = 6
+MAKS_KONTEKS = 6 
+BATAS_PERMINTAAN_MENIT = 15 
+BATAS_PERMINTAAN_JAM = 150 
+JENIS_FILE_DIIZINKAN = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+EKSTENSI_DIIZINKAN = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+
 RIWAYAT_OBROLAN: List[Dict] = []
 KONTEKS_PERCAKAPAN: List[Dict] = []
+PEMANTAUAN_AKSES: Dict[str, List[float]] = defaultdict(list)
+CADANGAN_KONFIGURASI: Dict = {}
 
 URUTAN_MODEL = [
     {"nama": "Groq", "aktif": False, "client": None, "model": "llama-3.1-8b-instant"},
@@ -129,6 +138,80 @@ if B2_KEY_ID and B2_APPLICATION_KEY:
     except Exception as e:
         logger.warning(f"⚠️ Gagal terhubung ke Backblaze B2: {str(e)}")
 
+def cek_batasan_akses(ip_pengguna: str) -> bool:
+    """Cek apakah pengguna melebihi batas kecepatan akses"""
+    sekarang = time.time()
+    # Hapus catatan yang lebih lama dari 1 jam
+    PEMANTAUAN_AKSES[ip_pengguna] = [waktu for waktu in PEMANTAUAN_AKSES[ip_pengguna] if sekarang - waktu < 3600]
+    
+    hitungan_menit = sum(1 for waktu in PEMANTAUAN_AKSES[ip_pengguna] if sekarang - waktu < 60)
+    hitungan_jam = len(PEMANTAUAN_AKSES[ip_pengguna])
+
+    if hitungan_menit >= BATAS_PERMINTAAN_MENIT:
+        logger.warning(f"🚫 Batas akses tercapai: IP {ip_pengguna} → {hitungan_menit} permintaan/menit")
+        return False
+    if hitungan_jam >= BATAS_PERMINTAAN_JAM:
+        logger.warning(f"🚫 Batas akses tercapai: IP {ip_pengguna} → {hitungan_jam} permintaan/jam")
+        return False
+
+    PEMANTAUAN_AKSES[ip_pengguna].append(sekarang)
+    return True
+
+def verifikasi_file(nama_file: str, tipe_konten: str = None) -> bool:
+    """Verifikasi ekstensi dan tipe file agar aman"""
+    ekstensi = os.path.splitext(nama_file.lower())[1]
+    if ekstensi not in EKSTENSI_DIIZINKAN:
+        logger.warning(f"⚠️ Ekstensi tidak diizinkan: {ekstensi} pada {nama_file}")
+        return False
+    if tipe_konten and tipe_konten not in JENIS_FILE_DIIZINKAN:
+        logger.warning(f"⚠️ Tipe konten tidak diizinkan: {tipe_konten} pada {nama_file}")
+        return False
+    return True
+
+def dapatkan_status_server() -> Dict:
+    """Ambil data penggunaan sumber daya server"""
+    try:
+        penggunaan_cpu = psutil.cpu_percent(interval=0.5)
+        memori = psutil.virtual_memory()
+        penggunaan_memori = memori.percent
+        ruang_disk = psutil.disk_usage('/')
+        return {
+            "waktu": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+            "cpu_persen": penggunaan_cpu,
+            "memori_persen": penggunaan_memori,
+            "memori_terpakai": f"{round(memori.used / (1024**3), 2)} GB",
+            "memori_total": f"{round(memori.total / (1024**3), 2)} GB",
+            "disk_persen": round((ruang_disk.used / ruang_disk.total) * 100, 1),
+            "status": "Normal" if penggunaan_cpu < 85 and penggunaan_memori < 85 else "Tinggi"
+        }
+    except Exception as e:
+        logger.error(f"❌ Gagal memantau sumber daya: {e}")
+        return {"status": "Tidak dapat dibaca", "error": str(e)}
+
+def simpan_cadangan_konfigurasi() -> None:
+    """Simpan salinan pengaturan penting secara aman"""
+    global CADANGAN_KONFIGURASI
+    try:
+        CADANGAN_KONFIGURASI = {
+            "tanggal_cadangan": datetime.now().isoformat(),
+            "batasan": {
+                "maks_konteks": MAKS_KONTEKS,
+                "batas_menit": BATAS_PERMINTAAN_MENIT,
+                "batas_jam": BATAS_PERMINTAAN_JAM,
+                "maks_ukuran_file_mb": MAKS_UKURAN_FILE_MB
+            },
+            "penyimpanan": {
+                "supabase_bucket": SUPABASE_BUCKET,
+                "supabase_maks_mb": SUPABASE_MAX_MB,
+                "b2_bucket": B2_BUCKET,
+                "tautan_berlaku_hari": TAUTAN_BERLAKU_DETIK // 86400
+            },
+            "model_aktif": [m["nama"] for m in URUTAN_MODEL if m["aktif"]]
+        }
+        logger.info("💾 Cadangan konfigurasi berhasil diperbarui")
+    except Exception as e:
+        logger.error(f"❌ Gagal menyimpan cadangan konfigurasi: {e}")
+
 def ukuran_ke_mb(byte: int) -> float:
     return round(byte / (1024 * 1024), 2)
 
@@ -156,7 +239,6 @@ def catat_riwayat(pertanyaan: str, jawaban: str):
         KONTEKS_PERCAKAPAN = KONTEKS_PERCAKAPAN[-(MAKS_KONTEKS * 2):]
 
 def reset_konteks():
-    """Reset konteks percakapan jika diminta"""
     global KONTEKS_PERCAKAPAN
     KONTEKS_PERCAKAPAN = []
     return "✅ Konteks percakapan telah dihapus. Kita bisa mulai topik baru."
@@ -184,6 +266,9 @@ def pindah_ke_backblaze(file: Dict) -> bool:
         return False
     try:
         nama = file["name"]
+        if not verifikasi_file(nama):
+            logger.warning(f"🚫 File tidak aman dilewati: {nama}")
+            return False
         ukuran = ukuran_ke_mb(file["metadata"]["size"])
         data = supabase.storage.from_(SUPABASE_BUCKET).download(nama)
         b2.put_object(Bucket=B2_BUCKET, Key=f"arsip/{nama}", Body=data, ContentType="image/jpeg")
@@ -198,7 +283,7 @@ def cek_dan_pindah_supabase() -> None:
     total, daftar = dapatkan_info_supabase()
     if total < SUPABASE_MAX_MB or not daftar:
         return
-    logger.warning(f"⚠️ Supabase penuh, pindahkan {SUPABASE_PINDAH_MB} MB terlama")
+    logger.warning(f"⚠️ Supabase hampir penuh, pindahkan {SUPABASE_PINDAH_MB} MB terlama")
     terpindah = 0.0
     for f in daftar:
         if terpindah >= SUPABASE_PINDAH_MB:
@@ -226,7 +311,7 @@ def cek_dan_bersihkan_b2() -> None:
     total, daftar = dapatkan_info_b2()
     if total < B2_MAX_MB or not daftar:
         return
-    logger.warning(f"⚠️ Backblaze penuh, hapus file hingga tersisa {B2_SISA_MB} MB")
+    logger.warning(f"⚠️ Backblaze hampir penuh, hapus file hingga tersisa {B2_SISA_MB} MB")
     for f in daftar:
         if total <= B2_SISA_MB:
             break
@@ -248,8 +333,10 @@ def buat_gambar(deskripsi: str) -> str:
             return f"❌ Ukuran terlalu besar ({ukuran_file:.1f} MB). Maksimal {MAKS_UKURAN_FILE_MB} MB."
 
         nama_file = buat_nama_file(deskripsi)
-        url_tautan = ""
+        if not verifikasi_file(nama_file, "image/jpeg"):
+            return "❌ Jenis file tidak diizinkan."
 
+        url_tautan = ""
         if supabase:
             try:
                 supabase.storage.from_(SUPABASE_BUCKET).upload(
@@ -286,7 +373,6 @@ def buat_gambar(deskripsi: str) -> str:
         return "❌ Maaf, fitur pembuatan gambar sedang bermasalah."
 
 def cari_informasi(kueri: str) -> str | None:
-    """Perbaiki: Gabungkan hasil dari berbagai sumber"""
     kueri_lengkap = f"{kueri} Indonesia terbaru"
     hasil_gabung = []
 
@@ -331,7 +417,6 @@ def cari_informasi(kueri: str) -> str | None:
         return f"🔍 **Informasi Terbaru:**\n\n{teks_panjang}"
 
 def buat_rangkuman(teks: str) -> str:
-    """Fitur baru: Buat ringkasan dari teks panjang"""
     prompt = f"""
     Buatlah ringkasan yang padat, jelas, dan mencakup semua poin penting dari teks berikut ini.
     Gunakan bahasa Indonesia yang mudah dimengerti.
@@ -344,7 +429,6 @@ def buat_rangkuman(teks: str) -> str:
     return tanya_model(prompt, hanya_rangkuman=True)
 
 def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
-    """Gunakan model secara berurutan dari yang tercepat"""
     pesan_sistem = INSTRUKSI_SISTEM
     if hanya_rangkuman:
         pesan_sistem += "\nLangsung berikan ringkasannya saja, tidak perlu penjelasan tambahan."
@@ -395,11 +479,18 @@ def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
 
     return "❌ Maaf, semua model sedang sibuk atau tidak tersedia. Silakan coba lagi nanti."
 
-def dapatkan_jawaban(pertanyaan: str) -> str:
+def dapatkan_jawaban(pertanyaan: str, ip_pengguna: str) -> str:
     teks = pertanyaan.strip().lower()
+
+    if not cek_batasan_akses(ip_pengguna):
+        return "⚠️ Terlalu banyak permintaan! Mohon tunggu sebentar sebelum mencoba lagi."
 
     if teks in ["reset", "hapus konteks", "mulai baru"]:
         return reset_konteks()
+    if teks == "status server":
+        return f"📊 **Status Server:**\n\n" + "\n".join([f"• {k}: {v}" for k, v in dapatkan_status_server().items()])
+    if teks == "lihat cadangan":
+        return f"💾 **Cadangan Konfigurasi:**\n\n" + "\n".join([f"• {k}: {v}" for k, v in CADANGAN_KONFIGURASI.items()])
 
     if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "gambar", "lukis")):
         return buat_gambar(pertanyaan)
@@ -453,15 +544,18 @@ def halaman_utama():
 
         <!-- Konten Utama -->
         <div class="flex-1 flex flex-col">
-            <div class="bg-white shadow p-3 flex items-center">
-                <button id="tombolBuka" onclick="toggleSidebar()" class="mr-3 text-gray-700 hover:text-gray-900 hidden">
-                    <i class="fa fa-chevron-right fa-lg"></i>
-                </button>
-                <h1 class="text-xl font-bold text-gray-800">Alina AI</h1>
+            <div class="bg-white shadow p-3 flex items-center justify-between">
+                <div class="flex items-center">
+                    <button id="tombolBuka" onclick="toggleSidebar()" class="mr-3 text-gray-700 hover:text-gray-900 hidden">
+                        <i class="fa fa-chevron-right fa-lg"></i>
+                    </button>
+                    <h1 class="text-xl font-bold text-gray-800">Alina AI</h1>
+                </div>
+                <small class="text-gray-500">v2.4.0 - Keamanan & Pemantauan Aktif</small>
             </div>
             <div id="konten-chat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
             <div class="p-4 bg-white border-t flex gap-2">
-                <input type="text" id="pesan" placeholder="Ketik pesan, perintah: 'rangkum teks...', 'reset', 'buat gambar...'" class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <input type="text" id="pesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
                 <button onclick="kirimPesan()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg">
                     <i class="fa fa-paper-plane"></i>
                 </button>
@@ -564,22 +658,24 @@ class PesanMasuk(BaseModel):
     pesan: str
 
 @app.post("/api/tanya")
-async def tanya_alina(data: PesanMasuk):
-    jawaban = dapatkan_jawaban(data.pesan)
+async def tanya_alina(data: PesanMasuk, request: Request):
+    ip_pengguna = request.client.host
+    jawaban = dapatkan_jawaban(data.pesan, ip_pengguna)
     return {"jawaban": jawaban}
 
 import threading
-def jadwal_pengecekan():
+def tugas_rutin():
     while True:
         try:
+            simpan_cadangan_konfigurasi()
             cek_dan_pindah_supabase()
             cek_dan_bersihkan_b2()
-            logger.info("✅ Pengecekan terjadwal selesai")
+            logger.info("✅ Tugas rutin selesai")
         except Exception as e:
-            logger.error(f"❌ Pengecekan gagal: {e}")
+            logger.error(f"❌ Tugas rutin gagal: {e}")
         time.sleep(6 * 3600)
 
-threading.Thread(target=jadwal_pengecekan, daemon=True).start()
+threading.Thread(target=tugas_rutin, daemon=True).start()
 
 if __name__ == "__main__":
     import uvicorn
