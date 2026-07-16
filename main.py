@@ -515,7 +515,7 @@ def halaman_utama():
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Alina AI - AI-nya Orang Indonesia</title>
         <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <style>
         /* Transisi sidebar yang stabil */
         .sidebar {
@@ -541,8 +541,7 @@ def halaman_utama():
 
                 <!-- Logo + Judul -->
                 <div class="flex items-center gap-3">
-                    <!-- ✅ Jalur sudah disesuaikan: assets (ada huruf s) -->
-                    <img src="/static/assets/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain" onerror="this.style.display='none'">
+                    <img src="/static/assets/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain">
                     <div>
                         <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
                         <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
@@ -585,9 +584,8 @@ def halaman_utama():
             </div>
         </div>
 
-        <!-- Semua fungsi JavaScript diletakkan di akhir agar pasti terbaca -->
         <script>
-        // ✅ Fungsi buka/tutup sidebar yang sudah diperbaiki
+        // Fungsi buka/tutup sidebar - DITULIS ULANG DENGAN BERSIH
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const tombolBuka = document.getElementById('tombolBuka');
@@ -626,8 +624,8 @@ def halaman_utama():
         function tampilkanPesan(pengirim, teks) {
             const kotak = document.getElementById('kontenChat');
             const balon = document.createElement('div');
-            balon.className = `p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ${pengirim==='Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800'}`;
-            balon.innerHTML = `<b>${pengirim}:</b><br>${teks.replace(/\n/g, '<br>')}`;
+            balon.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (pengirim === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
+            balon.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
             kotak.appendChild(balon);
             kotak.scrollTop = kotak.scrollHeight;
         }
@@ -635,7 +633,7 @@ def halaman_utama():
         function gantiPesanTerakhir(pengirim, teks) {
             const kotak = document.getElementById('kontenChat');
             const balon = kotak.lastChild;
-            balon.innerHTML = `<b>${pengirim}:</b><br>${teks.replace(/\n/g, '<br>')}`;
+            balon.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
         }
 
         async function muatRiwayat() {
@@ -647,11 +645,11 @@ def halaman_utama():
                 return;
             }
             kotak.innerHTML = '';
-            data.reverse().forEach(item => {
+            data.reverse().forEach(function(item) {
                 const el = document.createElement('div');
                 el.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700';
-                el.innerHTML = `<small class="text-gray-400">${item.waktu}</small><br><b>Tanya:</b> ${item.tanya.slice(0,45)}...`;
-                el.onclick = () => tampilkanLengkap(item);
+                el.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0,45) + '...';
+                el.onclick = function() { tampilkanLengkap(item); };
                 kotak.appendChild(el);
             });
         }
@@ -668,7 +666,6 @@ def halaman_utama():
             muatRiwayat();
         }
 
-        // Muat riwayat saat halaman selesai dimuat
         window.onload = muatRiwayat;
         </script>
     </body>
