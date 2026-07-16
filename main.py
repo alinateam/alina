@@ -522,43 +522,54 @@ def halaman_utama():
         <title>Alina AI</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+        <style>
+        /* Animasi transisi halus */
+        .sidebar-transition {
+            transition: all 0.3s ease-in-out;
+        }
+        </style>
     </head>
-    <body class="bg-gray-100 h-screen flex">
-        <!-- Sidebar Riwayat -->
-        <div id="sidebar" class="w-80 bg-white shadow-lg transition-all duration-300 ease-in-out">
-            <div class="p-4 border-b flex justify-between items-center">
-                <h3 class="text-lg font-semibold text-gray-800">Riwayat Obrolan</h3>
-                <div>
-                    <button onclick="resetSemua()" class="text-blue-600 mr-2" title="Mulai baru">
-                        <i class="fa fa-refresh"></i>
-                    </button>
-                    <button onclick="toggleSidebar()" class="text-gray-600 hover:text-gray-900">
-                        <i class="fa fa-chevron-left fa-lg"></i>
-                    </button>
-                </div>
+    <body class="bg-gray-100 h-screen flex flex-col">
+        <!-- Bar Atas -->
+        <div class="bg-white shadow p-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-gray-900 mr-2">
+                    <i class="fa fa-chevron-right fa-lg"></i>
+                </button>
+                <h1 class="text-xl font-bold text-gray-800">Alina AI</h1>
             </div>
-            <div id="riwayat" class="p-3 overflow-y-auto h-[calc(100vh-70px)] text-sm space-y-3">
-                <p class="text-gray-500 text-center">Belum ada riwayat</p>
-            </div>
+            <small class="text-gray-500">v2.4.0 - Keamanan & Pemantauan Aktif</small>
         </div>
 
-        <!-- Konten Utama -->
-        <div class="flex-1 flex flex-col">
-            <div class="bg-white shadow p-3 flex items-center justify-between">
-                <div class="flex items-center">
-                    <button id="tombolBuka" onclick="toggleSidebar()" class="mr-3 text-gray-700 hover:text-gray-900 hidden">
-                        <i class="fa fa-chevron-right fa-lg"></i>
-                    </button>
-                    <h1 class="text-xl font-bold text-gray-800">Alina AI</h1>
+        <!-- Konten Utama dengan Sidebar -->
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Sidebar Riwayat -->
+            <div id="sidebar" class="w-80 bg-white shadow-lg sidebar-transition">
+                <div class="p-4 border-b flex justify-between items-center">
+                    <h3 class="text-lg font-semibold text-gray-800">Riwayat Obrolan</h3>
+                    <div class="flex gap-2">
+                        <button onclick="resetSemua()" class="text-blue-600" title="Mulai baru">
+                            <i class="fa fa-refresh"></i>
+                        </button>
+                        <button id="tombolTutup" onclick="toggleSidebar()" class="text-gray-600 hover:text-gray-900">
+                            <i class="fa fa-chevron-left fa-lg"></i>
+                        </button>
+                    </div>
                 </div>
-                <small class="text-gray-500">v2.4.0 - Keamanan & Pemantauan Aktif</small>
+                <div id="riwayat" class="p-3 overflow-y-auto h-[calc(100vh-120px)] text-sm space-y-3">
+                    <p class="text-gray-500 text-center">Belum ada riwayat</p>
+                </div>
             </div>
-            <div id="konten-chat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
-            <div class="p-4 bg-white border-t flex gap-2">
-                <input type="text" id="pesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                <button onclick="kirimPesan()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg">
-                    <i class="fa fa-paper-plane"></i>
-                </button>
+
+            <!-- Area Obrolan -->
+            <div id="area-chat" class="flex-1 flex flex-col">
+                <div id="konten-chat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
+                <div class="p-4 bg-white border-t flex gap-2">
+                    <input type="text" id="pesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <button onclick="kirimPesan()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg">
+                        <i class="fa fa-paper-plane"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -566,11 +577,14 @@ def halaman_utama():
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const tombolBuka = document.getElementById('tombolBuka');
-            if(sidebar.classList.contains('w-80')) {
+            
+            if (sidebar.classList.contains('w-80')) {
+                // Sembunyikan sidebar
                 sidebar.classList.remove('w-80');
                 sidebar.classList.add('w-0');
                 tombolBuka.classList.remove('hidden');
             } else {
+                // Tampilkan sidebar
                 sidebar.classList.remove('w-0');
                 sidebar.classList.add('w-80');
                 tombolBuka.classList.add('hidden');
