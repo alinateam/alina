@@ -135,14 +135,24 @@ def dapatkan_info_supabase() -> tuple[float, List[Dict]]:
     if not supabase:
         return 0.0, []
     try:
-        daftar = supabase.storage.from_(SUPABASE_BUCKET).list(limit=1000, offset=0)
-        daftar_valid = [f for f in daftar if isinstance(f, dict) and "metadata" in f and "size" in f["metadata"]]
+        daftar = supabase.storage.from_(SUPABASE_BUCKET).list()
+        daftar_valid = [
+            f for f in daftar
+            if isinstance(f, dict)
+            and "name" in f
+            and "metadata" in f
+            and isinstance(f["metadata"], dict)
+            and "size" in f["metadata"]
+        ]
+
         total_byte = sum(f["metadata"]["size"] for f in daftar_valid)
         daftar_urut = sorted(daftar_valid, key=lambda x: x.get("created_at", ""))
-        logger.info(f"📊 Supabase: {ukuran_ke_mb(total_byte)} MB terpakai")
+
+        logger.info(f"📊 Supabase: {ukuran_ke_mb(total_byte)} MB terpakai | File: {len(daftar_valid)}")
         return ukuran_ke_mb(total_byte), daftar_urut
+
     except Exception as e:
-        logger.warning(f"⚠️ Sementara tidak bisa membaca daftar Supabase: {e}")
+        logger.warning(f"⚠️ Tidak bisa membaca daftar Supabase: {str(e)}")
         return 0.0, []
 
 def pindah_ke_backblaze(file: Dict) -> bool:
