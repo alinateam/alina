@@ -507,7 +507,7 @@ def dapatkan_jawaban(pertanyaan: str, ip_pengguna: str) -> str:
 
 @app.get("/", response_class=HTMLResponse)
 def halaman_utama():
-    return """
+    html = '''
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -516,210 +516,85 @@ def halaman_utama():
     <title>Alina AI - AI-nya Orang Indonesia</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: system-ui, sans-serif;
-        }
-        html, body {
-            height: 100%;
-            overflow: hidden;
-        }
-        body {
-            background-color: #f8fafc;
-            display: flex;
-            flex-direction: column;
-        }
-        /* Header */
+        * {margin:0; padding:0; box-sizing:border-box; font-family:Arial,sans-serif;}
+        html,body {height:100%; overflow:hidden;}
+        body {background:#f8fafc; display:flex; flex-direction:column;}
+
         .header {
-            background: #ffffff;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 12px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 64px;
+            background:#fff; border-bottom:1px solid #e2e8f0;
+            padding:12px 16px; height:64px;
+            display:flex; align-items:center; justify-content:space-between;
         }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .header-left {display:flex; align-items:center; gap:12px;}
         .btn-buka {
-            background: transparent;
-            border: none;
-            font-size: 20px;
-            color: #475569;
-            cursor: pointer;
-            padding: 8px;
-            border-radius: 6px;
+            background:transparent; border:none; font-size:20px; color:#475569;
+            cursor:pointer; padding:8px; border-radius:6px;
         }
-        .btn-buka:hover {
-            background: #f1f5f9;
-        }
-        .logo-wrap {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .logo {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            object-fit: cover;
-        }
-        .judul h1 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #0f172a;
-        }
-        .judul p {
-            font-size: 13px;
-            color: #64748b;
-        }
-        .versi {
-            font-size: 12px;
-            color: #94a3b8;
-        }
-        /* Konten Utama */
-        .konten-utama {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-        /* Sidebar Riwayat */
+        .btn-buka:hover {background:#f1f5f9;}
+        .logo-area {display:flex; align-items:center; gap:10px;}
+        .logo {width:36px; height:36px; border-radius:50%; object-fit:cover;}
+        .judul h1 {font-size:18px; font-weight:600; color:#0f172a;}
+        .judul p {font-size:13px; color:#64748b;}
+        .versi {font-size:12px; color:#94a3b8;}
+
+        .konten {flex:1; display:flex; overflow:hidden;}
+
         .sidebar {
-            width: 280px;
-            background: #ffffff;
-            border-right: 1px solid #e2e8f0;
-            display: flex;
-            flex-direction: column;
-            transition: width 0.3s ease, opacity 0.3s ease;
-            overflow: hidden;
-            flex-shrink: 0;
+            width:280px; background:#fff; border-right:1px solid #e2e8f0;
+            display:flex; flex-direction:column;
+            transition:width 0.3s ease, opacity 0.3s ease;
+            overflow:hidden; flex-shrink:0;
         }
-        .sidebar.tertutup {
-            width: 0;
-            opacity: 0;
-            border-right: none;
+        .sidebar.tertutup {width:0; opacity:0; border-right:none;}
+
+        .sidebar-head {
+            padding:12px; border-bottom:1px solid #e2e8f0;
+            display:flex; align-items:center; justify-content:space-between;
         }
-        .sidebar-header {
-            padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        .sidebar-header h3 {
-            font-size: 15px;
-            font-weight: 600;
-            color: #334155;
-        }
-        .sidebar-tombol {
-            display: flex;
-            gap: 8px;
-        }
+        .sidebar-head h3 {font-size:15px; font-weight:600; color:#334155;}
+        .tombol-grup {display:flex; gap:8px;}
         .tombol-ikon {
-            background: transparent;
-            border: none;
-            width: 30px;
-            height: 30px;
-            border-radius: 6px;
-            font-size: 16px;
-            color: #64748b;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background:transparent; border:none; width:30px; height:30px;
+            border-radius:6px; font-size:16px; color:#64748b;
+            cursor:pointer; display:flex; align-items:center; justify-content:center;
         }
-        .tombol-ikon:hover {
-            background: #f1f5f9;
-            color: #2563eb;
-        }
-        .sidebar-isi {
-            flex: 1;
-            padding: 12px;
-            overflow-y: auto;
-            font-size: 13px;
-        }
-        .kosong {
-            text-align: center;
-            padding: 40px 0;
-            color: #94a3b8;
-        }
-        /* Area Obrolan */
-        .area-chat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .daftar-pesan {
-            flex: 1;
-            padding: 16px;
-            overflow-y: auto;
-            background: #f8fafc;
-        }
+        .tombol-ikon:hover {background:#f1f5f9; color:#2563eb;}
+
+        .sidebar-isi {flex:1; padding:12px; overflow-y:auto; font-size:13px;}
+        .kosong {text-align:center; padding:40px 0; color:#94a3b8;}
+
+        .area-chat {flex:1; display:flex; flex-direction:column; overflow:hidden;}
+        .daftar-pesan {flex:1; padding:16px; overflow-y:auto; background:#f8fafc;}
         .balon {
-            max-width: 85%;
-            padding: 12px 14px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-            line-height: 1.5;
-            white-space: pre-wrap;
+            max-width:85%; padding:12px 14px; border-radius:10px;
+            margin-bottom:12px; line-height:1.5; white-space:pre-wrap;
         }
-        .pesan-saya {
-            background: #dbeafe;
-            margin-left: auto;
-            color: #1e40af;
-        }
-        .pesan-alina {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            color: #1e293b;
-        }
+        .pesan-saya {background:#dbeafe; margin-left:auto; color:#1e40af;}
+        .pesan-alina {background:#fff; border:1px solid #e2e8f0; color:#1e293b;}
+
         .form-kirim {
-            padding: 12px;
-            background: #ffffff;
-            border-top: 1px solid #e2e8f0;
-            display: flex;
-            gap: 8px;
+            padding:12px; background:#fff; border-top:1px solid #e2e8f0;
+            display:flex; gap:8px;
         }
         .input-pesan {
-            flex: 1;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-size: 14px;
-            outline: none;
+            flex:1; border:1px solid #cbd5e1; border-radius:8px;
+            padding:10px 14px; font-size:14px; outline:none;
         }
-        .input-pesan:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-        }
+        .input-pesan:focus {border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,0.2);}
         .tombol-kirim {
-            background: #2563eb;
-            border: none;
-            color: white;
-            padding: 0 20px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
+            background:#2563eb; border:none; color:#fff; padding:0 20px;
+            border-radius:8px; font-size:16px; cursor:pointer;
         }
-        .tombol-kirim:hover {
-            background: #1d4ed8;
-        }
+        .tombol-kirim:hover {background:#1d4ed8;}
     </style>
 </head>
 <body>
-    <!-- Header -->
     <div class="header">
         <div class="header-left">
-            <button id="tombolBuka" class="btn-buka" style="display: none;">
+            <button id="tombolBuka" class="btn-buka" style="display:none;">
                 <i class="fa fa-chevron-right"></i>
             </button>
-            <div class="logo-wrap">
+            <div class="logo-area">
                 <img src="/static/assets/logo.png" alt="Logo Alina" class="logo">
                 <div class="judul">
                     <h1>Alina AI</h1>
@@ -730,13 +605,11 @@ def halaman_utama():
         <div class="versi">v2.4.1 - Keamanan & Pemantauan Aktif</div>
     </div>
 
-    <!-- Konten Utama -->
-    <div class="konten-utama">
-        <!-- Sidebar Riwayat -->
+    <div class="konten">
         <div id="sidebar" class="sidebar">
-            <div class="sidebar-header">
+            <div class="sidebar-head">
                 <h3>Riwayat Obrolan</h3>
-                <div class="sidebar-tombol">
+                <div class="tombol-grup">
                     <button id="tombolReset" class="tombol-ikon" title="Mulai Baru">
                         <i class="fa fa-refresh"></i>
                     </button>
@@ -750,11 +623,10 @@ def halaman_utama():
             </div>
         </div>
 
-        <!-- Area Obrolan -->
         <div class="area-chat">
             <div id="kontenPesan" class="daftar-pesan"></div>
             <div class="form-kirim">
-                <input type="text" id="inputPesan" class="input-pesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks...">
+                <input type="text" id="inputPesan" class="input-pesan" placeholder="Ketik pesan...">
                 <button id="tombolKirim" class="tombol-kirim">
                     <i class="fa fa-paper-plane"></i>
                 </button>
@@ -763,118 +635,109 @@ def halaman_utama():
     </div>
 
     <script>
-        // Fungsi buka/tutup riwayat
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const btnBuka = document.getElementById('tombolBuka');
-            const btnTutup = document.getElementById('tombolTutup');
-
-            if (sidebar.classList.contains('tertutup')) {
-                sidebar.classList.remove('tertutup');
-                btnBuka.style.display = 'none';
-                btnTutup.style.display = 'flex';
-            } else {
-                sidebar.classList.add('tertutup');
-                btnBuka.style.display = 'flex';
-                btnTutup.style.display = 'none';
+            var s = document.getElementById('sidebar');
+            var b1 = document.getElementById('tombolBuka');
+            var b2 = document.getElementById('tombolTutup');
+            if(s.classList.contains('tertutup')){
+                s.classList.remove('tertutup');
+                b1.style.display = 'none';
+                b2.style.display = 'flex';
+            }else{
+                s.classList.add('tertutup');
+                b1.style.display = 'flex';
+                b2.style.display = 'none';
             }
         }
 
-        // Reset percakapan
         function resetSemua() {
             fetch('/api/tanya', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({pesan: "reset"})
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({pesan:'reset'})
             });
             document.getElementById('kontenPesan').innerHTML = '';
             muatRiwayat();
         }
 
-        // Kirim pesan
         async function kirimPesan() {
-            const input = document.getElementById('inputPesan');
-            const teks = input.value.trim();
-            if (!teks) return;
-            input.value = '';
-            tambahPesan('Anda', teks);
+            var i = document.getElementById('inputPesan');
+            var t = i.value.trim();
+            if(!t) return;
+            i.value = '';
+            tambahPesan('Anda', t);
             tambahPesan('Alina', 'Sedang memproses...');
-
             try {
-                const res = await fetch('/api/tanya', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({pesan: teks})
+                var r = await fetch('/api/tanya', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({pesan:t})
                 });
-                const data = await res.json();
-                gantiPesanTerakhir('Alina', data.jawaban);
+                var d = await r.json();
+                gantiTerakhir('Alina', d.jawaban);
                 muatRiwayat();
-            } catch (err) {
-                gantiPesanTerakhir('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
+            } catch(e) {
+                gantiTerakhir('Alina', '❌ Terjadi kesalahan.');
             }
         }
 
-        // Tambah pesan ke tampilan
-        function tambahPesan(pengirim, teks) {
-            const kotak = document.getElementById('kontenPesan');
-            const div = document.createElement('div');
-            div.className = 'balon ' + (pengirim === 'Anda' ? 'pesan-saya' : 'pesan-alina');
-            div.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
-            kotak.appendChild(div);
-            kotak.scrollTop = kotak.scrollHeight;
+        function tambahPesan(p, t) {
+            var k = document.getElementById('kontenPesan');
+            var d = document.createElement('div');
+            d.className = 'balon ' + (p==='Anda' ? 'pesan-saya' : 'pesan-alina');
+            d.innerHTML = '<b>' + p + ':</b><br>' + t.replace(/\n/g, '<br>');
+            k.appendChild(d);
+            k.scrollTop = k.scrollHeight;
         }
 
-        // Ganti pesan terakhir
-        function gantiPesanTerakhir(pengirim, teks) {
-            const kotak = document.getElementById('kontenPesan');
-            const terakhir = kotak.lastChild;
-            terakhir.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
+        function gantiTerakhir(p, t) {
+            var k = document.getElementById('kontenPesan');
+            var l = k.lastChild;
+            l.innerHTML = '<b>' + p + ':</b><br>' + t.replace(/\n/g, '<br>');
         }
 
-        // Muat riwayat
         async function muatRiwayat() {
-            const res = await fetch('/api/riwayat');
-            const data = await res.json();
-            const kotak = document.getElementById('riwayat');
-            if (data.length === 0) {
-                kotak.innerHTML = '<div class="kosong">Belum ada riwayat</div>';
-                return;
+            try {
+                var r = await fetch('/api/riwayat');
+                var d = await r.json();
+                var k = document.getElementById('riwayat');
+                if(d.length === 0) {
+                    k.innerHTML = '<div class="kosong">Belum ada riwayat</div>';
+                    return;
+                }
+                k.innerHTML = '';
+                d.reverse().forEach(function(item) {
+                    var div = document.createElement('div');
+                    div.style.cssText = 'padding:10px; margin:6px 0; border:1px solid #e2e8f0; border-radius:6px; cursor:pointer; font-size:13px;';
+                    div.innerHTML = '<small style="color:#94a3b8;">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0,45) + '...';
+                    div.onmouseover = function(){this.style.backgroundColor='#f8fafc';};
+                    div.onmouseout = function(){this.style.backgroundColor='transparent';};
+                    div.onclick = function(){
+                        document.getElementById('kontenPesan').innerHTML = '';
+                        tambahPesan('Anda', item.tanya);
+                        tambahPesan('Alina', item.jawaban);
+                    };
+                    k.appendChild(div);
+                });
+            } catch(e) {
+                document.getElementById('riwayat').innerHTML = '<div class="kosong">Tidak dapat memuat riwayat</div>';
             }
-            kotak.innerHTML = '';
-            data.reverse().forEach(function(item) {
-                const div = document.createElement('div');
-                div.style.padding = '10px';
-                div.style.margin = '6px 0';
-                div.style.border = '1px solid #e2e8f0';
-                div.style.borderRadius = '6px';
-                div.style.cursor = 'pointer';
-                div.style.fontSize = '13px';
-                div.innerHTML = '<small style="color:#94a3b8;">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
-                div.onmouseover = () => div.style.backgroundColor = '#f8fafc';
-                div.onmouseout = () => div.style.backgroundColor = 'transparent';
-                div.onclick = function() {
-                    document.getElementById('kontenPesan').innerHTML = '';
-                    tambahPesan('Anda', item.tanya);
-                    tambahPesan('Alina', item.jawaban);
-                };
-                kotak.appendChild(div);
-            });
         }
 
-        // Hubungkan tombol
         document.getElementById('tombolBuka').addEventListener('click', toggleSidebar);
         document.getElementById('tombolTutup').addEventListener('click', toggleSidebar);
         document.getElementById('tombolReset').addEventListener('click', resetSemua);
         document.getElementById('tombolKirim').addEventListener('click', kirimPesan);
-        document.getElementById('inputPesan').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') kirimPesan();
+        document.getElementById('inputPesan').addEventListener('keydown', function(e){
+            if(e.key === 'Enter') kirimPesan();
         });
 
         window.onload = muatRiwayat;
     </script>
 </body>
 </html>
-    """
+    '''
+    return HTMLResponse(content=html)
     
 @app.get("/api/riwayat")
 def dapatkan_riwayat():
