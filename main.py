@@ -508,184 +508,176 @@ def dapatkan_jawaban(pertanyaan: str, ip_pengguna: str) -> str:
 @app.get("/", response_class=HTMLResponse)
 def halaman_utama():
     return """
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Alina AI - AI-nya Orang Indonesia</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-        <style>
-        /* CSS sederhana dan aman */
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alina AI - AI-nya Orang Indonesia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <style>
         .sidebar {
-            transition: all 0.3s ease;
+            transition: width 0.3s ease;
             width: 280px;
             overflow: hidden;
         }
-        .sidebar.tertutup {
+        .sidebar.closed {
             width: 0;
             border-right: none;
         }
-        </style>
-    </head>
-    <body class="bg-gray-50 h-screen flex flex-col">
-        <!-- Bar Atas -->
-        <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col">
+    <!-- Header -->
+    <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <button id="btnOpen" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
+                <i class="fa fa-chevron-right fa-lg"></i>
+            </button>
             <div class="flex items-center gap-3">
-                <!-- Tombol Buka -->
-                <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
-                    <i class="fa fa-chevron-right fa-lg"></i>
-                </button>
-
-                <!-- Logo + Judul -->
-                <div class="flex items-center gap-3">
-                    <img src="/static/assets/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain">
-                    <div>
-                        <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
-                        <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
-                    </div>
+                <img src="/static/assets/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain">
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
+                    <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
                 </div>
             </div>
-            <small class="text-gray-500 text-xs">v2.4.1 - Keamanan & Pemantauan Aktif</small>
         </div>
+        <small class="text-gray-500 text-xs">v2.4.1 - Keamanan & Pemantauan Aktif</small>
+    </div>
 
-        <!-- Konten Utama -->
-        <div class="flex flex-1 overflow-hidden">
-            <!-- Sidebar Riwayat -->
-            <div id="sidebar" class="sidebar bg-white border-r shadow-sm">
-                <div class="p-3 border-b flex items-center justify-between">
-                    <h3 class="text-base font-semibold text-gray-700 whitespace-nowrap">Riwayat Obrolan</h3>
-                    <div class="flex gap-2">
-                        <button onclick="resetSemua()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
-                            <i class="fa fa-refresh"></i>
-                        </button>
-                        <button id="tombolTutup" onclick="toggleSidebar()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
-                            <i class="fa fa-chevron-left"></i>
-                        </button>
-                    </div>
-                </div>
-                <div id="riwayat" class="p-3 overflow-y-auto h-[calc(100vh-120px)] text-sm space-y-2">
-                    <p class="text-gray-400 text-center py-6">Belum ada riwayat</p>
-                </div>
-            </div>
-
-            <!-- Area Obrolan -->
-            <div id="areaObrolan" class="flex-1 flex flex-col h-full">
-                <div id="kontenChat" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
-                <div class="p-3 bg-white border-t flex gap-2">
-                    <input type="text" id="pesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." 
-                           class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
-                    <button onclick="kirimPesan()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
-                        <i class="fa fa-paper-plane"></i>
+    <!-- Main Content -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar bg-white border-r shadow-sm">
+            <div class="p-3 border-b flex items-center justify-between">
+                <h3 class="text-base font-semibold text-gray-700 whitespace-nowrap">Riwayat Obrolan</h3>
+                <div class="flex gap-2">
+                    <button id="btnReset" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
+                        <i class="fa fa-refresh"></i>
+                    </button>
+                    <button id="btnClose" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
+                        <i class="fa fa-chevron-left"></i>
                     </button>
                 </div>
             </div>
+            <div id="history" class="p-3 overflow-y-auto h-[calc(100vh-120px)] text-sm space-y-2">
+                <p class="text-gray-400 text-center py-6">Belum ada riwayat</p>
+            </div>
         </div>
 
-        <!-- Script JS ditulis paling sederhana & aman -->
-        <script>
-        // Fungsi utama buka/tutup riwayat
+        <!-- Chat Area -->
+        <div id="chatArea" class="flex-1 flex flex-col h-full">
+            <div id="chatContent" class="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50"></div>
+            <div class="p-3 bg-white border-t flex gap-2">
+                <input type="text" id="inputMsg" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." 
+                       class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                <button id="btnSend" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
+                    <i class="fa fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle Sidebar
         function toggleSidebar() {
             var sidebar = document.getElementById('sidebar');
-            var tombolBuka = document.getElementById('tombolBuka');
-            var tombolTutup = document.getElementById('tombolTutup');
-            
-            if (sidebar.classList.contains('tertutup')) {
-                sidebar.classList.remove('tertutup');
-                tombolBuka.classList.add('hidden');
-                tombolTutup.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('tertutup');
-                tombolBuka.classList.remove('hidden');
-                tombolTutup.classList.add('hidden');
-            }
+            var btnOpen = document.getElementById('btnOpen');
+            var btnClose = document.getElementById('btnClose');
+            sidebar.classList.toggle('closed');
+            btnOpen.classList.toggle('hidden');
+            btnClose.classList.toggle('hidden');
         }
 
-        // Fungsi kirim pesan
+        // Reset Chat
+        function resetSemua() {
+            fetch('/api/tanya', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({pesan: "reset"})
+            });
+            document.getElementById('chatContent').innerHTML = '';
+            loadHistory();
+        }
+
+        // Send Message
         async function kirimPesan() {
-            var input = document.getElementById('pesan');
-            var teks = input.value.trim();
-            if (!teks) return;
+            var input = document.getElementById('inputMsg');
+            var text = input.value.trim();
+            if (!text) return;
             input.value = '';
-            tampilkanPesan('Anda', teks);
-            tampilkanPesan('Alina', 'Sedang memproses...');
+            addMessage('Anda', text);
+            addMessage('Alina', 'Sedang memproses...');
 
             try {
                 var res = await fetch('/api/tanya', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({pesan: teks})
+                    body: JSON.stringify({pesan: text})
                 });
                 var data = await res.json();
-                gantiPesanTerakhir('Alina', data.jawaban);
-                muatRiwayat();
+                updateLastMessage('Alina', data.jawaban);
+                loadHistory();
             } catch (err) {
-                gantiPesanTerakhir('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
+                updateLastMessage('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
             }
         }
 
-        // Tampilkan pesan
-        function tampilkanPesan(pengirim, teks) {
-            var kotak = document.getElementById('kontenChat');
-            var balon = document.createElement('div');
-            balon.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (pengirim === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
-            balon.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
-            kotak.appendChild(balon);
-            kotak.scrollTop = kotak.scrollHeight;
+        // Add Message
+        function addMessage(sender, text) {
+            var box = document.getElementById('chatContent');
+            var div = document.createElement('div');
+            div.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (sender === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
+            div.innerHTML = '<b>' + sender + ':</b><br>' + text.replace(/\n/g, '<br>');
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
         }
 
-        // Ganti pesan terakhir
-        function gantiPesanTerakhir(pengirim, teks) {
-            var kotak = document.getElementById('kontenChat');
-            var balon = kotak.lastChild;
-            balon.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
+        // Update Last Message
+        function updateLastMessage(sender, text) {
+            var box = document.getElementById('chatContent');
+            var last = box.lastChild;
+            last.innerHTML = '<b>' + sender + ':</b><br>' + text.replace(/\n/g, '<br>');
         }
 
-        // Muat riwayat
-        async function muatRiwayat() {
+        // Load History
+        async function loadHistory() {
             var res = await fetch('/api/riwayat');
             var data = await res.json();
-            var kotak = document.getElementById('riwayat');
+            var box = document.getElementById('history');
             if (data.length === 0) {
-                kotak.innerHTML = '<p class="text-gray-400 text-center py-6">Belum ada riwayat</p>';
+                box.innerHTML = '<p class="text-gray-400 text-center py-6">Belum ada riwayat</p>';
                 return;
             }
-            kotak.innerHTML = '';
+            box.innerHTML = '';
             data.reverse().forEach(function(item) {
-                var el = document.createElement('div');
-                el.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700';
-                el.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
-                el.onclick = function() { tampilkanLengkap(item); };
-                kotak.appendChild(el);
+                var div = document.createElement('div');
+                div.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700';
+                div.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
+                div.onclick = function() {
+                    document.getElementById('chatContent').innerHTML = '';
+                    addMessage('Anda', item.tanya);
+                    addMessage('Alina', item.jawaban);
+                };
+                box.appendChild(div);
             });
         }
 
-        // Tampilkan percakapan lengkap
-        function tampilkanLengkap(item) {
-            document.getElementById('kontenChat').innerHTML = '';
-            tampilkanPesan('Anda', item.tanya);
-            tampilkanPesan('Alina', item.jawaban);
-        }
+        // Bind Events
+        document.getElementById('btnOpen').addEventListener('click', toggleSidebar);
+        document.getElementById('btnClose').addEventListener('click', toggleSidebar);
+        document.getElementById('btnReset').addEventListener('click', resetSemua);
+        document.getElementById('btnSend').addEventListener('click', kirimPesan);
+        document.getElementById('inputMsg').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') kirimPesan();
+        });
 
-        // Reset percakapan
-        async function resetSemua() {
-            await fetch('/api/tanya', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({pesan: "reset"})
-            });
-            document.getElementById('kontenChat').innerHTML = '';
-            muatRiwayat();
-        }
-
-        // Jalankan saat halaman siap
-        window.onload = muatRiwayat;
-        </script>
-    </body>
-    </html>
+        window.onload = loadHistory;
+    </script>
+</body>
+</html>
     """
-
 @app.get("/api/riwayat")
 def dapatkan_riwayat():
     return RIWAYAT_OBROLAN
