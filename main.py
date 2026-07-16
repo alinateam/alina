@@ -517,14 +517,15 @@ def halaman_utama():
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
         <style>
-        /* Transisi halus */
+        /* Transisi yang lebih stabil */
         .sidebar {
-            transition: width 0.3s ease, transform 0.3s ease;
+            transition: all 0.3s ease;
             overflow: hidden;
+            width: 280px;
         }
         .sidebar.tertutup {
-            width: 0 !important;
-            transform: translateX(-100%);
+            width: 0;
+            min-width: 0;
         }
         </style>
     </head>
@@ -532,15 +533,15 @@ def halaman_utama():
         <!-- Bar Atas -->
         <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <!-- Tombol buka/tutup -->
-                <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-1 rounded hover:bg-gray-100">
+                <!-- Tombol Buka/Tutup -->
+                <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100">
                     <i class="fa fa-chevron-right fa-lg"></i>
                 </button>
 
                 <!-- Logo + Judul -->
                 <div class="flex items-center gap-3">
-                    <!-- Alamat logo sesuai lokasi kamu -->
-                    <img src="/static/asset/logo.png" alt="Logo Alina" class="h-8 w-auto object-contain">
+                    <!-- Jalur logo sesuai lokasi Anda -->
+                    <img src="/static/asset/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain">
                     <div>
                         <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
                         <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
@@ -553,14 +554,14 @@ def halaman_utama():
         <!-- Konten Utama -->
         <div class="flex flex-1 overflow-hidden">
             <!-- Sidebar Riwayat -->
-            <div id="sidebar" class="sidebar w-72 bg-white border-r shadow-sm">
+            <div id="sidebar" class="sidebar bg-white border-r shadow-sm">
                 <div class="p-3 border-b flex items-center justify-between">
-                    <h3 class="text-base font-semibold text-gray-700">Riwayat Obrolan</h3>
+                    <h3 class="text-base font-semibold text-gray-700 whitespace-nowrap">Riwayat Obrolan</h3>
                     <div class="flex gap-2">
-                        <button onclick="resetSemua()" class="text-gray-600 hover:text-blue-600 p-1 rounded hover:bg-gray-100" title="Mulai baru">
+                        <button onclick="resetSemua()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
                             <i class="fa fa-refresh"></i>
                         </button>
-                        <button id="tombolTutup" onclick="toggleSidebar()" class="text-gray-600 hover:text-blue-600 p-1 rounded hover:bg-gray-100" title="Sembunyikan riwayat">
+                        <button id="tombolTutup" onclick="toggleSidebar()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
                             <i class="fa fa-chevron-left"></i>
                         </button>
                     </div>
@@ -584,11 +585,11 @@ def halaman_utama():
         </div>
 
         <script>
-        // Fungsi buka/tutup sidebar
+        // Fungsi buka/tutup yang sudah diperbaiki
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const tombolBuka = document.getElementById('tombolBuka');
-
+            
             sidebar.classList.toggle('tertutup');
             tombolBuka.classList.toggle('hidden');
         }
