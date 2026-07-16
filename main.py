@@ -517,13 +517,13 @@ def halaman_utama():
         <script src="https://cdn.tailwindcss.com"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
         <style>
-        /* Sidebar transisi sederhana & aman */
+        /* CSS sederhana dan aman */
         .sidebar {
             transition: all 0.3s ease;
             width: 280px;
             overflow: hidden;
         }
-        .sidebar.closed {
+        .sidebar.tertutup {
             width: 0;
             border-right: none;
         }
@@ -534,7 +534,7 @@ def halaman_utama():
         <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <!-- Tombol Buka -->
-                <button id="btnBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
+                <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
                     <i class="fa fa-chevron-right fa-lg"></i>
                 </button>
 
@@ -560,7 +560,7 @@ def halaman_utama():
                         <button onclick="resetSemua()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
                             <i class="fa fa-refresh"></i>
                         </button>
-                        <button id="btnTutup" onclick="toggleSidebar()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
+                        <button id="tombolTutup" onclick="toggleSidebar()" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
                             <i class="fa fa-chevron-left"></i>
                         </button>
                     </div>
@@ -583,35 +583,41 @@ def halaman_utama():
             </div>
         </div>
 
-        <!-- Script JS ditulis paling akhir, tanpa sintaks bermasalah -->
+        <!-- Script JS ditulis paling sederhana & aman -->
         <script>
-        // Fungsi buka/tutup sidebar
+        // Fungsi utama buka/tutup riwayat
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const btnBuka = document.getElementById('btnBuka');
-            const btnTutup = document.getElementById('btnTutup');
-
-            sidebar.classList.toggle('closed');
-            btnBuka.classList.toggle('hidden');
-            btnTutup.classList.toggle('hidden');
+            var sidebar = document.getElementById('sidebar');
+            var tombolBuka = document.getElementById('tombolBuka');
+            var tombolTutup = document.getElementById('tombolTutup');
+            
+            if (sidebar.classList.contains('tertutup')) {
+                sidebar.classList.remove('tertutup');
+                tombolBuka.classList.add('hidden');
+                tombolTutup.classList.remove('hidden');
+            } else {
+                sidebar.classList.add('tertutup');
+                tombolBuka.classList.remove('hidden');
+                tombolTutup.classList.add('hidden');
+            }
         }
 
         // Fungsi kirim pesan
         async function kirimPesan() {
-            const input = document.getElementById('pesan');
-            const teks = input.value.trim();
+            var input = document.getElementById('pesan');
+            var teks = input.value.trim();
             if (!teks) return;
             input.value = '';
             tampilkanPesan('Anda', teks);
             tampilkanPesan('Alina', 'Sedang memproses...');
 
             try {
-                const res = await fetch('/api/tanya', {
+                var res = await fetch('/api/tanya', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({pesan: teks})
                 });
-                const data = await res.json();
+                var data = await res.json();
                 gantiPesanTerakhir('Alina', data.jawaban);
                 muatRiwayat();
             } catch (err) {
@@ -619,10 +625,10 @@ def halaman_utama():
             }
         }
 
-        // Tampilkan pesan baru
+        // Tampilkan pesan
         function tampilkanPesan(pengirim, teks) {
-            const kotak = document.getElementById('kontenChat');
-            const balon = document.createElement('div');
+            var kotak = document.getElementById('kontenChat');
+            var balon = document.createElement('div');
             balon.className = 'p-3 rounded-lg max-w-[88%] whitespace-pre-wrap ' + (pengirim === 'Anda' ? 'bg-blue-100 ml-auto text-gray-800' : 'bg-white border border-gray-200 text-gray-800');
             balon.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
             kotak.appendChild(balon);
@@ -631,23 +637,23 @@ def halaman_utama():
 
         // Ganti pesan terakhir
         function gantiPesanTerakhir(pengirim, teks) {
-            const kotak = document.getElementById('kontenChat');
-            const balon = kotak.lastChild;
+            var kotak = document.getElementById('kontenChat');
+            var balon = kotak.lastChild;
             balon.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
         }
 
-        // Muat riwayat obrolan
+        // Muat riwayat
         async function muatRiwayat() {
-            const res = await fetch('/api/riwayat');
-            const data = await res.json();
-            const kotak = document.getElementById('riwayat');
+            var res = await fetch('/api/riwayat');
+            var data = await res.json();
+            var kotak = document.getElementById('riwayat');
             if (data.length === 0) {
                 kotak.innerHTML = '<p class="text-gray-400 text-center py-6">Belum ada riwayat</p>';
                 return;
             }
             kotak.innerHTML = '';
             data.reverse().forEach(function(item) {
-                const el = document.createElement('div');
+                var el = document.createElement('div');
                 el.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700';
                 el.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
                 el.onclick = function() { tampilkanLengkap(item); };
@@ -674,7 +680,7 @@ def halaman_utama():
         }
 
         // Jalankan saat halaman siap
-        window.addEventListener('load', muatRiwayat);
+        window.onload = muatRiwayat;
         </script>
     </body>
     </html>
