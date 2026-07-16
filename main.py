@@ -514,116 +514,248 @@ def halaman_utama():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alina AI - AI-nya Orang Indonesia</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <style>
-        /* Semua gaya ditulis di sini agar aman dan tidak memicu error */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            font-family: system-ui, sans-serif;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
         }
         body {
-            height: 100vh;
+            background-color: #f8fafc;
             display: flex;
             flex-direction: column;
-            background-color: #f9fafb;
         }
+        /* Header */
+        .header {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .btn-buka {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            color: #475569;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 6px;
+        }
+        .btn-buka:hover {
+            background: #f1f5f9;
+        }
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+        .judul h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .judul p {
+            font-size: 13px;
+            color: #64748b;
+        }
+        .versi {
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        /* Konten Utama */
+        .konten-utama {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        /* Sidebar Riwayat */
         .sidebar {
             width: 280px;
-            flex-shrink: 0;
-            border-right: 1px solid #e5e7eb;
-            background-color: white;
+            background: #ffffff;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease, opacity 0.3s ease;
             overflow: hidden;
-            transition: all 0.3s ease;
+            flex-shrink: 0;
         }
         .sidebar.tertutup {
             width: 0;
-            min-width: 0;
-            border-right: none;
             opacity: 0;
+            border-right: none;
+        }
+        .sidebar-header {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .sidebar-header h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #334155;
+        }
+        .sidebar-tombol {
+            display: flex;
+            gap: 8px;
+        }
+        .tombol-ikon {
+            background: transparent;
+            border: none;
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            color: #64748b;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .tombol-ikon:hover {
+            background: #f1f5f9;
+            color: #2563eb;
         }
         .sidebar-isi {
-            height: calc(100vh - 120px);
-            overflow-y: auto;
+            flex: 1;
             padding: 12px;
+            overflow-y: auto;
+            font-size: 13px;
         }
+        .kosong {
+            text-align: center;
+            padding: 40px 0;
+            color: #94a3b8;
+        }
+        /* Area Obrolan */
         .area-chat {
             flex: 1;
             display: flex;
             flex-direction: column;
-            height: 100%;
+            overflow: hidden;
         }
-        .konten-pesan {
+        .daftar-pesan {
             flex: 1;
-            overflow-y: auto;
             padding: 16px;
-            background-color: #f9fafb;
+            overflow-y: auto;
+            background: #f8fafc;
         }
-        .balon-pesan {
-            max-width: 88%;
-            padding: 12px;
-            border-radius: 8px;
+        .balon {
+            max-width: 85%;
+            padding: 12px 14px;
+            border-radius: 10px;
             margin-bottom: 12px;
+            line-height: 1.5;
             white-space: pre-wrap;
         }
         .pesan-saya {
-            background-color: #dbeafe;
+            background: #dbeafe;
             margin-left: auto;
             color: #1e40af;
         }
         .pesan-alina {
-            background-color: white;
-            border: 1px solid #e5e7eb;
-            color: #1f2937;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: #1e293b;
+        }
+        .form-kirim {
+            padding: 12px;
+            background: #ffffff;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 8px;
+        }
+        .input-pesan {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            outline: none;
+        }
+        .input-pesan:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        .tombol-kirim {
+            background: #2563eb;
+            border: none;
+            color: white;
+            padding: 0 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .tombol-kirim:hover {
+            background: #1d4ed8;
         }
     </style>
 </head>
 <body>
     <!-- Header -->
-    <div class="bg-white shadow-sm border-b px-4 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <button id="tombolBuka" class="text-gray-700 hover:text-blue-600 p-2 rounded hover:bg-gray-100 hidden">
-                <i class="fa fa-chevron-right fa-lg"></i>
+    <div class="header">
+        <div class="header-left">
+            <button id="tombolBuka" class="btn-buka" style="display: none;">
+                <i class="fa fa-chevron-right"></i>
             </button>
-            <div class="flex items-center gap-3">
-                <img src="/static/assets/logo.png" alt="Logo Alina" class="h-9 w-auto object-contain">
-                <div>
-                    <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
-                    <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
+            <div class="logo-wrap">
+                <img src="/static/assets/logo.png" alt="Logo Alina" class="logo">
+                <div class="judul">
+                    <h1>Alina AI</h1>
+                    <p>AI-nya Orang Indonesia</p>
                 </div>
             </div>
         </div>
-        <small class="text-gray-500 text-xs">v2.4.1 - Keamanan & Pemantauan Aktif</small>
+        <div class="versi">v2.4.1 - Keamanan & Pemantauan Aktif</div>
     </div>
 
     <!-- Konten Utama -->
-    <div class="flex flex-1 overflow-hidden">
+    <div class="konten-utama">
         <!-- Sidebar Riwayat -->
         <div id="sidebar" class="sidebar">
-            <div class="p-3 border-b flex items-center justify-between">
-                <h3 class="text-base font-semibold text-gray-700 whitespace-nowrap">Riwayat Obrolan</h3>
-                <div class="flex gap-2">
-                    <button id="tombolReset" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Mulai Baru">
+            <div class="sidebar-header">
+                <h3>Riwayat Obrolan</h3>
+                <div class="sidebar-tombol">
+                    <button id="tombolReset" class="tombol-ikon" title="Mulai Baru">
                         <i class="fa fa-refresh"></i>
                     </button>
-                    <button id="tombolTutup" class="text-gray-600 hover:text-blue-600 p-1.5 rounded hover:bg-gray-100" title="Sembunyikan Riwayat">
+                    <button id="tombolTutup" class="tombol-ikon" title="Sembunyikan Riwayat">
                         <i class="fa fa-chevron-left"></i>
                     </button>
                 </div>
             </div>
-            <div id="riwayat" class="sidebar-isi text-sm space-y-2">
-                <p class="text-gray-400 text-center py-6">Belum ada riwayat</p>
+            <div id="riwayat" class="sidebar-isi">
+                <div class="kosong">Belum ada riwayat</div>
             </div>
         </div>
 
         <!-- Area Obrolan -->
         <div class="area-chat">
-            <div id="kontenChat" class="konten-pesan"></div>
-            <div class="p-3 bg-white border-t flex gap-2">
-                <input type="text" id="inputPesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks..." 
-                       class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent">
-                <button id="tombolKirim" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg transition">
+            <div id="kontenPesan" class="daftar-pesan"></div>
+            <div class="form-kirim">
+                <input type="text" id="inputPesan" class="input-pesan" placeholder="Ketik pesan | Perintah: reset, status server, rangkum teks...">
+                <button id="tombolKirim" class="tombol-kirim">
                     <i class="fa fa-paper-plane"></i>
                 </button>
             </div>
@@ -631,20 +763,20 @@ def halaman_utama():
     </div>
 
     <script>
-        // Fungsi buka/tutup sidebar
+        // Fungsi buka/tutup riwayat
         function toggleSidebar() {
-            var sidebar = document.getElementById('sidebar');
-            var tombolBuka = document.getElementById('tombolBuka');
-            var tombolTutup = document.getElementById('tombolTutup');
-            
+            const sidebar = document.getElementById('sidebar');
+            const btnBuka = document.getElementById('tombolBuka');
+            const btnTutup = document.getElementById('tombolTutup');
+
             if (sidebar.classList.contains('tertutup')) {
                 sidebar.classList.remove('tertutup');
-                tombolBuka.classList.add('hidden');
-                tombolTutup.classList.remove('hidden');
+                btnBuka.style.display = 'none';
+                btnTutup.style.display = 'flex';
             } else {
                 sidebar.classList.add('tertutup');
-                tombolBuka.classList.remove('hidden');
-                tombolTutup.classList.add('hidden');
+                btnBuka.style.display = 'flex';
+                btnTutup.style.display = 'none';
             }
         }
 
@@ -655,66 +787,73 @@ def halaman_utama():
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({pesan: "reset"})
             });
-            document.getElementById('kontenChat').innerHTML = '';
+            document.getElementById('kontenPesan').innerHTML = '';
             muatRiwayat();
         }
 
         // Kirim pesan
         async function kirimPesan() {
-            var input = document.getElementById('inputPesan');
-            var teks = input.value.trim();
+            const input = document.getElementById('inputPesan');
+            const teks = input.value.trim();
             if (!teks) return;
             input.value = '';
             tambahPesan('Anda', teks);
             tambahPesan('Alina', 'Sedang memproses...');
 
             try {
-                var res = await fetch('/api/tanya', {
+                const res = await fetch('/api/tanya', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({pesan: teks})
                 });
-                var data = await res.json();
-                ubahPesanTerakhir('Alina', data.jawaban);
+                const data = await res.json();
+                gantiPesanTerakhir('Alina', data.jawaban);
                 muatRiwayat();
             } catch (err) {
-                ubahPesanTerakhir('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
+                gantiPesanTerakhir('Alina', '❌ Terjadi kesalahan. Silakan coba lagi.');
             }
         }
 
         // Tambah pesan ke tampilan
         function tambahPesan(pengirim, teks) {
-            var kotak = document.getElementById('kontenChat');
-            var div = document.createElement('div');
-            div.className = 'balon-pesan ' + (pengirim === 'Anda' ? 'pesan-saya' : 'pesan-alina');
+            const kotak = document.getElementById('kontenPesan');
+            const div = document.createElement('div');
+            div.className = 'balon ' + (pengirim === 'Anda' ? 'pesan-saya' : 'pesan-alina');
             div.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
             kotak.appendChild(div);
             kotak.scrollTop = kotak.scrollHeight;
         }
 
-        // Ubah pesan terakhir
-        function ubahPesanTerakhir(pengirim, teks) {
-            var kotak = document.getElementById('kontenChat');
-            var terakhir = kotak.lastChild;
+        // Ganti pesan terakhir
+        function gantiPesanTerakhir(pengirim, teks) {
+            const kotak = document.getElementById('kontenPesan');
+            const terakhir = kotak.lastChild;
             terakhir.innerHTML = '<b>' + pengirim + ':</b><br>' + teks.replace(/\n/g, '<br>');
         }
 
         // Muat riwayat
         async function muatRiwayat() {
-            var res = await fetch('/api/riwayat');
-            var data = await res.json();
-            var kotak = document.getElementById('riwayat');
+            const res = await fetch('/api/riwayat');
+            const data = await res.json();
+            const kotak = document.getElementById('riwayat');
             if (data.length === 0) {
-                kotak.innerHTML = '<p class="text-gray-400 text-center py-6">Belum ada riwayat</p>';
+                kotak.innerHTML = '<div class="kosong">Belum ada riwayat</div>';
                 return;
             }
             kotak.innerHTML = '';
             data.reverse().forEach(function(item) {
-                var div = document.createElement('div');
-                div.className = 'p-2 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer transition text-gray-700 mb-2';
-                div.innerHTML = '<small class="text-gray-400">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
+                const div = document.createElement('div');
+                div.style.padding = '10px';
+                div.style.margin = '6px 0';
+                div.style.border = '1px solid #e2e8f0';
+                div.style.borderRadius = '6px';
+                div.style.cursor = 'pointer';
+                div.style.fontSize = '13px';
+                div.innerHTML = '<small style="color:#94a3b8;">' + item.waktu + '</small><br><b>Tanya:</b> ' + item.tanya.slice(0, 45) + '...';
+                div.onmouseover = () => div.style.backgroundColor = '#f8fafc';
+                div.onmouseout = () => div.style.backgroundColor = 'transparent';
                 div.onclick = function() {
-                    document.getElementById('kontenChat').innerHTML = '';
+                    document.getElementById('kontenPesan').innerHTML = '';
                     tambahPesan('Anda', item.tanya);
                     tambahPesan('Alina', item.jawaban);
                 };
