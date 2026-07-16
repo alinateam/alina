@@ -539,8 +539,8 @@ def halaman_utama():
 
                 <!-- Logo + Judul -->
                 <div class="flex items-center gap-3">
-                    <!-- Ganti URL ini dengan tautan logo Anda -->
-                    <img src="/static/logo-alina.png" alt="Logo Alina" class="h-9 w-auto rounded">
+                    <!-- Alamat logo sesuai lokasi kamu -->
+                    <img src="/static/asset/logo.png" alt="Logo Alina" class="h-8 w-auto object-contain">
                     <div>
                         <h1 class="text-xl font-bold text-gray-800 leading-tight">Alina AI</h1>
                         <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
