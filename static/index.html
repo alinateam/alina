@@ -87,6 +87,18 @@
             .modal.active {
                 display: flex;
             }
+            /* ➕ Gaya untuk sembunyi/tampil sidebar */
+            .sidebar-utama {
+                transition: all 0.3s ease;
+                flex-shrink: 0;
+            }
+            .sidebar-utama.tertutup {
+                width: 0 !important;
+                min-width: 0 !important;
+                border-right: none !important;
+                opacity: 0;
+                overflow: hidden;
+            }
         }
     </style>
 </head>
@@ -135,27 +147,32 @@
 
 <div id="app" class="flex h-screen max-w-7xl mx-auto shadow-lg">
 
-    <aside class="w-72 bg-sidebar dark:bg-sidebarDark border-r border-gray-200 dark:border-gray-700 flex flex-col">
-        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div class="flex items-center gap-3 mb-4">
+    <!-- ➕ Tambah ID dan kelas untuk kontrol -->
+    <aside id="sidebarUtama" class="sidebar-utama w-72 bg-sidebar dark:bg-sidebarDark border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-full bg-white border border-gray-200 dark:border-gray-700 flex items-center justify-center overflow-hidden">
                     <img src="/static/assets/logo.png" alt="Logo Alina" class="w-full h-full object-contain">
                 </div>
                 <h2 class="text-lg font-bold">Alina AI</h2>
             </div>
-
-            <div id="infoPengguna" class="mb-4 text-sm text-gray-600 dark:text-gray-300 hidden">
-                <p>Halo, <span id="namaPengguna"></span></p>
-                <button onclick="keluarAkun()" class="text-red-500 text-xs mt-1 hover:underline">Keluar</button>
-            </div>
-            <button id="tombolMasuk" onclick="bukaModal()" class="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg py-2 px-3 mb-4">
-                <i class="fa fa-user mr-2"></i> Masuk / Daftar
-            </button>
-
-            <button id="obrolanBaru" class="w-full bg-alina hover:bg-alinaDark text-white rounded-lg py-2 px-3 flex items-center justify-center gap-2">
-                <i class="fa fa-plus"></i> Obrolan Baru
+            <!-- ➕ Tombol sembunyikan sidebar -->
+            <button id="tombolTutupSidebar" onclick="toggleSidebar()" class="text-gray-500 hover:text-alina p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fa fa-chevron-left"></i>
             </button>
         </div>
+
+        <div id="infoPengguna" class="mb-4 text-sm text-gray-600 dark:text-gray-300 hidden px-4">
+            <p>Halo, <span id="namaPengguna"></span></p>
+            <button onclick="keluarAkun()" class="text-red-500 text-xs mt-1 hover:underline">Keluar</button>
+        </div>
+        <button id="tombolMasuk" onclick="bukaModal()" class="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white rounded-lg py-2 px-3 mb-4 mx-4">
+            <i class="fa fa-user mr-2"></i> Masuk / Daftar
+        </button>
+
+        <button id="obrolanBaru" class="w-full bg-alina hover:bg-alinaDark text-white rounded-lg py-2 px-3 flex items-center justify-center gap-2 mb-4 mx-4">
+            <i class="fa fa-plus"></i> Obrolan Baru
+        </button>
 
         <div class="flex-1 p-3 overflow-y-auto scrollbar-thin">
             <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Riwayat Obrolan</h3>
@@ -174,6 +191,10 @@
 
     <main class="flex-1 flex flex-col">
         <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex justify-between items-center">
+            <!-- ➕ Tombol tampilkan sidebar (muncul saat sidebar tertutup) -->
+            <button id="tombolBukaSidebar" onclick="toggleSidebar()" class="text-gray-700 dark:text-gray-200 hover:text-alina mr-3 hidden">
+                <i class="fa fa-chevron-right fa-lg"></i>
+            </button>
             <h1 class="text-xl font-bold">AI-nya Orang Indonesia</h1>
         </header>
 
@@ -205,6 +226,23 @@
     const API_DASAR = "/api";
     let percakapanAktifId = null;
     let penggunaSaatIni = null;
+
+    // ➕ Fungsi buka/tutup sidebar
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebarUtama');
+        const tombolBuka = document.getElementById('tombolBukaSidebar');
+        const tombolTutup = document.getElementById('tombolTutupSidebar');
+        
+        if (sidebar.classList.contains('tertutup')) {
+            sidebar.classList.remove('tertutup');
+            tombolBuka.classList.add('hidden');
+            tombolTutup.classList.remove('hidden');
+        } else {
+            sidebar.classList.add('tertutup');
+            tombolBuka.classList.remove('hidden');
+            tombolTutup.classList.add('hidden');
+        }
+    }
 
     const modeToggle = document.getElementById('modeToggle');
     if (localStorage.getItem('mode') === 'gelap' || 
