@@ -23,7 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="2.4.0")
+app = FastAPI(title="Alina AI", version="2.4.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,7 +44,7 @@ Tanggal saat ini: {datetime.now().strftime('%d %B %Y')}.
 Aturan wajib:
 1. Jawab selalu dalam bahasa Indonesia atau bahasa yang digunakan pengguna dengan lembut, sopan, jelas, dan mudah dimengerti.
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, kecerdasan buatan yang dikembangkan di Indonesia oleh Tim Alina."
-3. Jawab lengkap, akurat, dan sesuai konteks percakapan sebelumnya.
+3. Jawab lengkap, akurat dan sesuai konteks percakapan sebelumnya.
 4. Jika tidak tahu jawaban, katakan dengan jujur.
 5. Jika diminta merangkum, berikan ringkasan yang padat, jelas, dan mencakup poin-poin penting.
 6. Tawarkan informasi tambahan yang relevan sebagai penutup jawaban.
@@ -139,9 +139,7 @@ if B2_KEY_ID and B2_APPLICATION_KEY:
         logger.warning(f"⚠️ Gagal terhubung ke Backblaze B2: {str(e)}")
 
 def cek_batasan_akses(ip_pengguna: str) -> bool:
-    """Cek apakah pengguna melebihi batas kecepatan akses"""
     sekarang = time.time()
-    # Hapus catatan yang lebih lama dari 1 jam
     PEMANTAUAN_AKSES[ip_pengguna] = [waktu for waktu in PEMANTAUAN_AKSES[ip_pengguna] if sekarang - waktu < 3600]
     
     hitungan_menit = sum(1 for waktu in PEMANTAUAN_AKSES[ip_pengguna] if sekarang - waktu < 60)
@@ -158,7 +156,6 @@ def cek_batasan_akses(ip_pengguna: str) -> bool:
     return True
 
 def verifikasi_file(nama_file: str, tipe_konten: str = None) -> bool:
-    """Verifikasi ekstensi dan tipe file agar aman"""
     ekstensi = os.path.splitext(nama_file.lower())[1]
     if ekstensi not in EKSTENSI_DIIZINKAN:
         logger.warning(f"⚠️ Ekstensi tidak diizinkan: {ekstensi} pada {nama_file}")
@@ -169,7 +166,6 @@ def verifikasi_file(nama_file: str, tipe_konten: str = None) -> bool:
     return True
 
 def dapatkan_status_server() -> Dict:
-    """Ambil data penggunaan sumber daya server"""
     try:
         penggunaan_cpu = psutil.cpu_percent(interval=0.5)
         memori = psutil.virtual_memory()
@@ -189,7 +185,6 @@ def dapatkan_status_server() -> Dict:
         return {"status": "Tidak dapat dibaca", "error": str(e)}
 
 def simpan_cadangan_konfigurasi() -> None:
-    """Simpan salinan pengaturan penting secara aman"""
     global CADANGAN_KONFIGURASI
     try:
         CADANGAN_KONFIGURASI = {
@@ -221,7 +216,6 @@ def buat_nama_file(deskripsi: str) -> str:
     return f"{waktu}_{id_unik}.jpg"
 
 def catat_riwayat(pertanyaan: str, jawaban: str):
-    """Simpan riwayat lengkap dan konteks percakapan"""
     global RIWAYAT_OBROLAN, KONTEKS_PERCAKAPAN
     
     RIWAYAT_OBROLAN.append({
@@ -456,7 +450,7 @@ def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
             elif model["nama"] == "OpenRouter":
                 res = requests.post(
                     "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "HTTP-Referer": "https://alina.id", "Content-Type": "application/json"},
+                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "HTTP-Referer": "https://alina.id", "X-Title": "Alina AI", "Content-Type": "application/json"},
                     json={"model": model["model"], "messages": [{"role": "system", "content": pesan_sistem}] + KONTEKS_PERCAKAPAN + [{"role": "user", "content": pertanyaan}], "max_tokens": 1024},
                     timeout=25
                 )
@@ -471,7 +465,7 @@ def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
                     timeout=25
                 )
                 res.raise_for_status()
-                return res.json()["choices"][0]["message"]["content"].strip()
+                return res.json()["choices"][0]["message"].strip()
 
         except Exception as e:
             logger.warning(f"⚠️ Model {model['nama']} gagal: {e}")
@@ -519,11 +513,10 @@ def halaman_utama():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Alina AI</title>
+        <title>Alina AI - AI-nya Orang Indonesia</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
         <style>
-        /* Animasi transisi halus */
         .sidebar-transition {
             transition: all 0.3s ease-in-out;
         }
@@ -536,9 +529,12 @@ def halaman_utama():
                 <button id="tombolBuka" onclick="toggleSidebar()" class="text-gray-700 hover:text-gray-900 mr-2">
                     <i class="fa fa-chevron-right fa-lg"></i>
                 </button>
-                <h1 class="text-xl font-bold text-gray-800">Alina AI</h1>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">Alina AI</h1>
+                    <p class="text-sm text-gray-500 italic">AI-nya Orang Indonesia</p>
+                </div>
             </div>
-            <small class="text-gray-500">v2.4.0 - Keamanan & Pemantauan Aktif</small>
+            <small class="text-gray-500">v2.4.1 - Keamanan & Pemantauan Aktif</small>
         </div>
 
         <!-- Konten Utama dengan Sidebar -->
@@ -579,12 +575,10 @@ def halaman_utama():
             const tombolBuka = document.getElementById('tombolBuka');
             
             if (sidebar.classList.contains('w-80')) {
-                // Sembunyikan sidebar
                 sidebar.classList.remove('w-80');
                 sidebar.classList.add('w-0');
                 tombolBuka.classList.remove('hidden');
             } else {
-                // Tampilkan sidebar
                 sidebar.classList.remove('w-0');
                 sidebar.classList.add('w-80');
                 tombolBuka.classList.add('hidden');
