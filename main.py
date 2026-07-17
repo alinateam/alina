@@ -507,7 +507,7 @@ def dapatkan_jawaban(pertanyaan: str, ip_pengguna: str) -> str:
 
 @app.get("/")
 def halaman_utama():
-    return FileResponse("static/assets/index.html")
+    return FileResponse("static/index.html", media_type="text/html")
 
 @app.get("/api/riwayat")
 def dapatkan_riwayat():
