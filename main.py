@@ -250,7 +250,6 @@ def reset_konteks():
     KONTEKS_PERCAKAPAN = []
     return "✅ Konteks percakapan telah dihapus. Kita bisa mulai topik baru."
 
-# Fungsi baca Supabase diperbaiki agar tidak error dan lebih aman
 def dapatkan_info_supabase() -> tuple[float, List[Dict]]:
     if not supabase:
         logger.debug("ℹ️ Supabase tidak terhubung, dilewati")
@@ -357,6 +356,7 @@ def buat_gambar(deskripsi: str) -> str:
             return "❌ Jenis file tidak diizinkan."
 
         url_tautan = ""
+
         if supabase:
             try:
                 supabase.storage.from_(SUPABASE_BUCKET).upload(
@@ -366,32 +366,53 @@ def buat_gambar(deskripsi: str) -> str:
                 )
                 cek_dan_pindah_supabase()
                 url_tautan = supabase.storage.from_(SUPABASE_BUCKET).get_public_url(nama_file)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"⚠️ Simpan ke Supabase gagal, pindah ke Backblaze: {e}")
                 if b2:
-                    b2.put_object(Bucket=B2_BUCKET, Key=f"langsung/{nama_file}", Body=res_gambar.content, ContentType="image/jpeg")
+                    b2.put_object(
+                        Bucket=B2_BUCKET,
+                        Key=f"langsung/{nama_file}",
+                        Body=res_gambar.content,
+                        ContentType="image/jpeg"
+                    )
                     cek_dan_bersihkan_b2()
                     url_tautan = b2.generate_presigned_url(
                         "get_object",
                         Params={"Bucket": B2_BUCKET, "Key": f"langsung/{nama_file}"},
                         ExpiresIn=TAUTAN_BERLAKU_DETIK
                     )
+
+        elif b2:
+            b2.put_object(
+                Bucket=B2_BUCKET,
+                Key=f"langsung/{nama_file}",
+                Body=res_gambar.content,
+                ContentType="image/jpeg"
+            )
+            cek_dan_bersihkan_b2()
+            url_tautan = b2.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": B2_BUCKET, "Key": f"langsung/{nama_file}"},
+                ExpiresIn=TAUTAN_BERLAKU_DETIK
+            )
+
         else:
-            res_pendek = requests.get(f"https://tinyurl.com/api-create.php?url={url_panjang}", timeout=15)
-            res_pendek.raise_for_status()
-            url_tautan = res_pendek.text.strip()
+            url_tautan = url_panjang
+            logger.info("ℹ️ Tidak ada penyimpanan aktif, menggunakan tautan langsung dari sumber")
 
         hasil = f"""✅ Berikut gambar yang Anda minta:
 
 🔗 {url_tautan}
 
 *Tautan berlaku selama 7 hari*"""
+
         catat_riwayat(deskripsi, hasil)
         return hasil
 
     except Exception as e:
-        logger.error(f"❌ Gambar gagal: {e}")
+        logger.error(f"❌ Gambar gagal dibuat: {e}")
         return "❌ Maaf, fitur pembuatan gambar sedang bermasalah."
-
+        
 def cari_informasi(kueri: str) -> str | None:
     kueri_lengkap = f"{kueri} Indonesia terbaru"
     hasil_gabung = []
