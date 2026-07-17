@@ -145,7 +145,9 @@ else:
 
 def get_db():
     if not DB_AKTIF or not SessionLocal:
-        return None
+        yield None
+        return
+
     db = SessionLocal()
     try:
         yield db
