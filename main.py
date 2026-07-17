@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Alina AI",
-    version="2.5.0",
+    version="2.5.1",
     docs_url=None,
     redoc_url=None
 )
@@ -94,18 +94,19 @@ BATAS_PERMINTAAN_JAM = 150
 JENIS_FILE_DIIZINKAN = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 EKSTENSI_DIIZINKAN = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback").strip()
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 SECRET_KEY = os.getenv("SECRET_KEY", str(uuid.uuid4()))
 ALGORITMA_JWT = "HS256"
 MASA_BERLAKU_SESI = 7
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+engine = None
+SessionLocal = None
 Base = declarative_base()
+DB_AKTIF = False
 
 class PenggunaDB(Base):
     __tablename__ = "pengguna"
@@ -123,9 +124,28 @@ class RiwayatDB(Base):
     tanya = Column(Text, nullable=False)
     jawab = Column(Text, nullable=False)
 
-Base.metadata.create_all(bind=engine)
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    try:
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            connect_args={"connect_timeout": 10}
+        )
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        Base.metadata.create_all(bind=engine)
+        DB_AKTIF = True
+        logger.info("✅ Database PostgreSQL terhubung & tabel siap")
+    except Exception as e:
+        logger.warning(f"⚠️ Gagal terhubung ke database: {e}")
+        logger.info("ℹ️ Fitur login & riwayat akan dinonaktifkan sementara")
+else:
+    logger.info("ℹ️ Variabel DATABASE_URL belum diisi, fitur login dinonaktifkan")
 
 def get_db():
+    if not DB_AKTIF or not SessionLocal:
+        raise HTTPException(status_code=503, detail="Fitur ini belum tersedia")
     db = SessionLocal()
     try:
         yield db
@@ -134,15 +154,20 @@ def get_db():
 
 oauth2_scheme = OAuth2AuthorizationCodeBearer(
     authorizationUrl="https://accounts.google.com/o/oauth2/v2/auth",
-    tokenUrl="https://oauth2.googleapis.com/token"
+    tokenUrl="https://oauth2.googleapis.com/token",
+    auto_error=False
 )
 
 async def dapatkan_pengguna_saat_ini(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    if not DB_AKTIF:
+        raise HTTPException(status_code=503, detail="Sistem login belum dikonfigurasi")
     kredensial_salah = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Tidak dapat memverifikasi kredensial",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if not token:
+        raise kredensial_salah
     try:
         muatan = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMA_JWT])
         google_id: str = muatan.get("sub")
@@ -294,10 +319,15 @@ def buat_nama_file(deskripsi: str) -> str:
     return f"{waktu}_{id_unik}.jpg"
 
 def catat_riwayat_pengguna(db: Session, google_id: str, pertanyaan: str, jawaban: str):
-    baru = RiwayatDB(google_id=google_id, tanya=pertanyaan, jawab=jawaban)
-    db.add(baru)
-    db.commit()
-    db.refresh(baru)
+    if not DB_AKTIF:
+        return
+    try:
+        baru = RiwayatDB(google_id=google_id, tanya=pertanyaan, jawab=jawaban)
+        db.add(baru)
+        db.commit()
+        db.refresh(baru)
+    except Exception as e:
+        logger.warning(f"⚠️ Gagal menyimpan riwayat: {e}")
 
 def reset_konteks() -> str:
     return "✅ Konteks percakapan telah dihapus. Kita bisa mulai topik baru."
@@ -529,7 +559,7 @@ def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
             if model["nama"] == "Groq":
                 res = model["client"].chat.completions.create(
                     model=model["model"],
-                    messages=[{"role": "system", "content": pesan_sistem}] + [{"role": "user", "content": pertanyaan}],
+                    messages=[{"role": "system", "content": pesan_sistem}, {"role": "user", "content": pertanyaan}],
                     max_tokens=1024,
                     temperature=0.7
                 )
@@ -568,14 +598,14 @@ def tanya_model(pertanyaan: str, hanya_rangkuman: bool = False) -> str:
 
 @app.get("/auth/google")
 def masuk_dengan_google():
-    if not GOOGLE_CLIENT_ID:
+    if not GOOGLE_CLIENT_ID or not GOOGLE_REDIRECT_URI:
         return JSONResponse(status_code=500, content={"pesan": "Konfigurasi login belum lengkap"})
     return RedirectResponse(
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={GOOGLE_CLIENT_ID}&"
         f"redirect_uri={GOOGLE_REDIRECT_URI}&"
         f"response_type=code&"
-        f"scope=openid email profile&"
+        f"scope=openid%20email%20profile&"
         f"access_type=offline&"
         f"prompt=consent",
         status_code=302
@@ -583,8 +613,10 @@ def masuk_dengan_google():
 
 @app.get("/auth/callback")
 async def proses_callback_google(code: str, db: Session = Depends(get_db)):
+    if not DB_AKTIF:
+        return JSONResponse(status_code=503, content={"pesan": "Sistem login belum dikonfigurasi"})
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        return JSONResponse(status_code=500, content={"pesan": "Konfigurasi belum lengkap"})
+        return JSONResponse(status_code=500, content={"pesan": "Konfigurasi login belum lengkap"})
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
@@ -665,8 +697,8 @@ class PesanMasuk(BaseModel):
 async def tanya_alina(
     data: PesanMasuk,
     request: Request,
-    pengguna: PenggunaDB = Depends(dapatkan_pengguna_saat_ini),
-    db: Session = Depends(get_db)
+    pengguna: Optional[PenggunaDB] = Depends(dapatkan_pengguna_saat_ini),
+    db: Session = Depends(get_db) if DB_AKTIF else None
 ):
     ip_pengguna = request.client.host
     teks = data.pesan.strip().lower()
@@ -683,23 +715,27 @@ async def tanya_alina(
 
     if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "gambar", "lukis")):
         hasil = buat_gambar(data.pesan)
-        catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
+        if DB_AKTIF and pengguna:
+            catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
         return {"jawaban": hasil}
 
     if teks.startswith(("rangkum", "ringkas", "buat ringkasan", "rangkumkan")):
         hasil = buat_rangkuman(data.pesan.split(" ", 1)[1])
-        catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
+        if DB_AKTIF and pengguna:
+            catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
         return {"jawaban": hasil}
 
     kata_cari = ["cari", "info terbaru", "berita", "data terbaru", "saat ini", "sekarang", "hari ini", "berapa harga", "kurs", "cuaca"]
     if any(kata in teks for kata in kata_cari):
         hasil_cari = cari_informasi(data.pesan)
         if hasil_cari:
-            catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil_cari)
+            if DB_AKTIF and pengguna:
+                catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil_cari)
             return {"jawaban": hasil_cari}
 
     jawaban = tanya_model(data.pesan)
-    catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, jawaban)
+    if DB_AKTIF and pengguna:
+        catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, jawaban)
     return {"jawaban": jawaban}
 
 import threading
