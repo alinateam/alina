@@ -706,46 +706,67 @@ class PesanMasuk(BaseModel):
 @app.post("/api/tanya")
 async def tanya_alina(
     data: PesanMasuk,
-    request: Request,
-    pengguna: Optional[PenggunaDB] = Depends(dapatkan_pengguna_saat_ini),
-    db: Optional[Session] = Depends(get_db)
+    request: Request
 ):
     ip_pengguna = request.client.host
     teks = data.pesan.strip().lower()
 
     if not cek_batasan_akses(ip_pengguna):
-        return {"jawaban": "⚠️ Terlalu banyak permintaan! Mohon tunggu sebentar sebelum mencoba lagi."}
+        return {
+            "jawaban": "⚠️ Terlalu banyak permintaan! Mohon tunggu sebentar sebelum mencoba lagi."
+        }
 
     if teks in ["reset", "hapus konteks", "mulai baru"]:
         return {"jawaban": reset_konteks()}
+
     if teks == "status server":
-        return {"jawaban": f"📊 **Status Server:**\n\n" + "\n".join([f"• {k}: {v}" for k, v in dapatkan_status_server().items()])}
+        return {
+            "jawaban": f"📊 **Status Server:**\n\n" +
+            "\n".join(
+                [f"• {k}: {v}" for k, v in dapatkan_status_server().items()]
+            )
+        }
+
     if teks == "lihat cadangan":
-        return {"jawaban": f"💾 **Cadangan Konfigurasi:**\n\n" + "\n".join([f"• {k}: {v}" for k, v in CADANGAN_KONFIGURASI.items()])}
+        return {
+            "jawaban": f"💾 **Cadangan Konfigurasi:**\n\n" +
+            "\n".join(
+                [f"• {k}: {v}" for k, v in CADANGAN_KONFIGURASI.items()]
+            )
+        }
 
     if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "gambar", "lukis")):
         hasil = buat_gambar(data.pesan)
-        if DB_AKTIF and pengguna and db:
-            catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
         return {"jawaban": hasil}
 
     if teks.startswith(("rangkum", "ringkas", "buat ringkasan", "rangkumkan")):
-        hasil = buat_rangkuman(data.pesan.split(" ", 1)[1])
-        if DB_AKTIF and pengguna and db:
-            catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
+        try:
+            bagian = data.pesan.split(" ", 1)[1]
+        except IndexError:
+            return {"jawaban": "Silakan masukkan teks yang ingin dirangkum."}
+
+        hasil = buat_rangkuman(bagian)
         return {"jawaban": hasil}
 
-    kata_cari = ["cari", "info terbaru", "berita", "data terbaru", "saat ini", "sekarang", "hari ini", "berapa harga", "kurs", "cuaca"]
+    kata_cari = [
+        "cari",
+        "info terbaru",
+        "berita",
+        "data terbaru",
+        "saat ini",
+        "sekarang",
+        "hari ini",
+        "berapa harga",
+        "kurs",
+        "cuaca"
+    ]
+
     if any(kata in teks for kata in kata_cari):
         hasil_cari = cari_informasi(data.pesan)
         if hasil_cari:
-            if DB_AKTIF and pengguna and db:
-                catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil_cari)
             return {"jawaban": hasil_cari}
 
     jawaban = tanya_model(data.pesan)
-    if DB_AKTIF and pengguna and db:
-        catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, jawaban)
     return {"jawaban": jawaban}
 
 import threading
