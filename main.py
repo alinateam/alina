@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -23,7 +23,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Alina AI", version="2.4.1")
+app = FastAPI(
+    title="Alina AI",
+    version="2.4.1",
+    docs_url=None,
+    redoc_url=None
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +43,13 @@ if not os.path.exists("static"):
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+@app.exception_handler(404)
+async def halaman_tidak_ditemukan(request: Request, exc):
+    return JSONResponse(
+        status_code=status.HTTP_404_NOT_FOUND,
+        content={"pesan": "Halaman tidak ditemukan"}
+    )
+
 INSTRUKSI_SISTEM = f"""
 Anda adalah Alina AI, asisten cerdas yang dikembangkan di Indonesia oleh Tim Alina.
 Tanggal saat ini: {datetime.now().strftime('%d %B %Y')}.
@@ -46,7 +58,7 @@ Aturan wajib:
 2. Jika ditanya siapa Anda atau pembuatnya, jawab: "Saya Alina AI, kecerdasan buatan yang dikembangkan di Indonesia oleh Tim Alina."
 3. Jawab lengkap, akurat dan sesuai konteks percakapan sebelumnya.
 4. Jika tidak tahu jawaban, katakan dengan jujur.
-5. Jika diminta merangkum, berikan ringkasan yang padat, jelas, dan mencakup poin-poin penting.
+5. Jika diminta merangkum, berikan ringkasan yang padat, jelas, dan mencakup semua poin penting.
 6. Tawarkan informasi tambahan yang relevan sebagai penutup jawaban.
 """
 
@@ -238,6 +250,7 @@ def reset_konteks():
     KONTEKS_PERCAKAPAN = []
     return "✅ Konteks percakapan telah dihapus. Kita bisa mulai topik baru."
 
+# Fungsi baca Supabase diperbaiki agar tidak error dan lebih aman
 def dapatkan_info_supabase() -> tuple[float, List[Dict]]:
     if not supabase:
         logger.debug("ℹ️ Supabase tidak terhubung, dilewati")
