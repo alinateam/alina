@@ -145,7 +145,7 @@ else:
 
 def get_db():
     if not DB_AKTIF or not SessionLocal:
-        raise HTTPException(status_code=503, detail="Fitur ini belum tersedia")
+        return None
     db = SessionLocal()
     try:
         yield db
@@ -176,6 +176,9 @@ async def dapatkan_pengguna_saat_ini(token: str = Depends(oauth2_scheme), db: Se
     except JWTError:
         raise kredensial_salah
 
+    if not db:
+        raise HTTPException(status_code=503, detail="Database tidak tersedia")
+        
     pengguna = db.query(PenggunaDB).filter(PenggunaDB.google_id == google_id).first()
     if pengguna is None:
         raise kredensial_salah
@@ -319,7 +322,7 @@ def buat_nama_file(deskripsi: str) -> str:
     return f"{waktu}_{id_unik}.jpg"
 
 def catat_riwayat_pengguna(db: Session, google_id: str, pertanyaan: str, jawaban: str):
-    if not DB_AKTIF:
+    if not DB_AKTIF or not db:
         return
     try:
         baru = RiwayatDB(google_id=google_id, tanya=pertanyaan, jawab=jawaban)
@@ -644,6 +647,9 @@ async def proses_callback_google(code: str, db: Session = Depends(get_db)):
         email = data_profil["email"]
         nama = data_profil.get("name", "Pengguna Alina")
 
+        if not db:
+            return JSONResponse(status_code=503, content={"pesan": "Database tidak tersedia, gagal menyimpan data akun"})
+
         pengguna = db.query(PenggunaDB).filter(PenggunaDB.google_id == google_id).first()
         if not pengguna:
             pengguna = PenggunaDB(google_id=google_id, email=email, nama=nama)
@@ -681,6 +687,8 @@ def halaman_utama():
 
 @app.get("/api/riwayat")
 def dapatkan_riwayat(pengguna: PenggunaDB = Depends(dapatkan_pengguna_saat_ini), db: Session = Depends(get_db)):
+    if not db:
+        raise HTTPException(status_code=503, detail="Riwayat tidak tersedia karena database belum terhubung")
     riwayat = db.query(RiwayatDB).filter(RiwayatDB.google_id == pengguna.google_id).order_by(RiwayatDB.waktu.desc()).limit(50).all()
     return [
         {
@@ -698,7 +706,7 @@ async def tanya_alina(
     data: PesanMasuk,
     request: Request,
     pengguna: Optional[PenggunaDB] = Depends(dapatkan_pengguna_saat_ini),
-    db: Session = Depends(get_db) if DB_AKTIF else None
+    db: Optional[Session] = Depends(get_db)
 ):
     ip_pengguna = request.client.host
     teks = data.pesan.strip().lower()
@@ -715,13 +723,13 @@ async def tanya_alina(
 
     if teks.startswith(("buat gambar", "gambarkan", "bikin gambar", "gambar", "lukis")):
         hasil = buat_gambar(data.pesan)
-        if DB_AKTIF and pengguna:
+        if DB_AKTIF and pengguna and db:
             catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
         return {"jawaban": hasil}
 
     if teks.startswith(("rangkum", "ringkas", "buat ringkasan", "rangkumkan")):
         hasil = buat_rangkuman(data.pesan.split(" ", 1)[1])
-        if DB_AKTIF and pengguna:
+        if DB_AKTIF and pengguna and db:
             catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil)
         return {"jawaban": hasil}
 
@@ -729,12 +737,12 @@ async def tanya_alina(
     if any(kata in teks for kata in kata_cari):
         hasil_cari = cari_informasi(data.pesan)
         if hasil_cari:
-            if DB_AKTIF and pengguna:
+            if DB_AKTIF and pengguna and db:
                 catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, hasil_cari)
             return {"jawaban": hasil_cari}
 
     jawaban = tanya_model(data.pesan)
-    if DB_AKTIF and pengguna:
+    if DB_AKTIF and pengguna and db:
         catat_riwayat_pengguna(db, pengguna.google_id, data.pesan, jawaban)
     return {"jawaban": jawaban}
 
