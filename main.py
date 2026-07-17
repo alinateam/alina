@@ -56,7 +56,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "alina-sementara")
 SUPABASE_MAX_MB = 40
@@ -119,7 +119,8 @@ supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_SERVICE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-        logger.info("✅ Supabase Storage terhubung")
+        supabase.storage.list_buckets()
+        logger.info("✅ Supabase Storage terhubung dan siap")
     except Exception as e:
         logger.warning(f"⚠️ Gagal terhubung ke Supabase: {str(e)}")
 
@@ -239,18 +240,30 @@ def reset_konteks():
 
 def dapatkan_info_supabase() -> tuple[float, List[Dict]]:
     if not supabase:
+        logger.debug("ℹ️ Supabase tidak terhubung, dilewati")
         return 0.0, []
     try:
         daftar = supabase.storage.from_(SUPABASE_BUCKET).list()
-        daftar_valid = [
-            f for f in daftar
-            if isinstance(f, dict) and "name" in f and "metadata" in f
-            and isinstance(f["metadata"], dict) and "size" in f["metadata"]
-        ]
-        total_byte = sum(f["metadata"]["size"] for f in daftar_valid)
+        if not isinstance(daftar, list):
+            raise ValueError(f"Respons tidak valid: {daftar}")
+
+        daftar_valid = []
+        for berkas in daftar:
+            if isinstance(berkas, dict) and "name" in berkas:
+                if berkas["name"] == ".emptyFolderPlaceholder":
+                    continue
+                ukuran = berkas.get("metadata", {}).get("size", 0)
+                daftar_valid.append({
+                    "name": berkas["name"],
+                    "metadata": {"size": ukuran},
+                    "created_at": berkas.get("created_at", "")
+                })
+
+        total_byte = sum(item["metadata"]["size"] for item in daftar_valid)
         daftar_urut = sorted(daftar_valid, key=lambda x: x.get("created_at", ""))
-        logger.info(f"📊 Supabase: {ukuran_ke_mb(total_byte)} MB | File: {len(daftar_valid)}")
+        logger.info(f"📊 Supabase {SUPABASE_BUCKET}: {ukuran_ke_mb(total_byte)} MB | File: {len(daftar_valid)}")
         return ukuran_ke_mb(total_byte), daftar_urut
+
     except Exception as e:
         logger.warning(f"⚠️ Tidak bisa membaca Supabase: {str(e)}")
         return 0.0, []
