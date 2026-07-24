@@ -1,4 +1,3 @@
-Ini adalah kode yang terakhir kamu berikan : 
 from fastapi import FastAPI, Request, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
