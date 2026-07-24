@@ -102,7 +102,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", str(uuid.uuid4()))
 ALGORITMA_JWT = "HS256"
 MASA_BERLAKU_SESI = 7
 
-# === PERBAIKAN UTAMA: Otomatis perbaiki format DATABASE_URL ===
+# === PERBAIKAN MUTLAK: Bersihkan format alamat secara paksa ===
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 engine = None
 SessionLocal = None
@@ -126,17 +126,19 @@ class RiwayatDB(Base):
     jawab = Column(Text, nullable=False)
 
 if DATABASE_URL:
-    # Otomatis hapus awalan db. jika masih ada
-    if "@db." in DATABASE_URL:
-        DATABASE_URL = DATABASE_URL.replace("@db.", "@")
-    # Otomatis ubah format lama
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    # 🔒 PEMAKSAAN PERBAIKAN: Apapun alamatnya, akan dibersihkan dulu
+    DATABASE_URL = DATABASE_URL.replace("@db.", "@")
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
+    DATABASE_URL = DATABASE_URL.replace("aws-0-", "aws-1-")
+    DATABASE_URL = DATABASE_URL.strip()
+
+    logger.info(f"🔍 Alamat DB setelah dibersihkan: {DATABASE_URL[:50]}...")
+
     try:
         engine = create_engine(
             DATABASE_URL,
             pool_pre_ping=True,
-            connect_args={"connect_timeout": 10}
+            connect_args={"connect_timeout": 15}
         )
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         Base.metadata.create_all(bind=engine)
